@@ -331,24 +331,124 @@ class PhoenixRisingUI:
         )
     
     def render_service_unavailable_message(self) -> None:
-        """Render a professional service unavailability message."""
+        """Render an enhanced service unavailability message with status and recommendations."""
         st.markdown(
             """
             <div class="maintenance-card">
-                <h3>🌅 Service Restoration in Progress</h3>
-                <p>
-                    Our sanctuary is briefly entering a period of rest to conserve resources. 
-                    Like the phoenix itself, our service occasionally needs moments of 
-                    quietude before rising anew.
+                <h3>🌅 Sanctuary Renewal in Progress</h3>
+                <p class="status-message">
+                    Our sacred space is currently in a brief period of restoration. This natural cycle 
+                    helps maintain the sanctuary's strength and resilience.
                 </p>
-                <p>
-                    Please try again in a few moments. Your patience allows us to maintain 
-                    this space as a sustainable refuge for all who seek it.
-                </p>
+                <div class="maintenance-details">
+                    <h4>What's Happening?</h4>
+                    <p>To preserve the quality of our sanctuary and ensure sustainable operation, 
+                    our service occasionally enters a brief rest state. This process typically 
+                    lasts 2-3 minutes.</p>
+                    
+                    <h4>During This Time:</h4>
+                    <ul class="maintenance-list">
+                        <li>Your entry has been safely preserved</li>
+                        <li>A thoughtfully crafted alternative response has been provided</li>
+                        <li>All your previous journal entries remain secure</li>
+                    </ul>
+                    
+                    <h4>Recommended Actions:</h4>
+                    <ul class="maintenance-list">
+                        <li>Take this moment for gentle reflection</li>
+                        <li>Review your previous journal entries and insights</li>
+                        <li>Return in a few minutes to continue your journey</li>
+                    </ul>
+                </div>
                 <div class="maintenance-progress">
                     <div class="progress-bar"></div>
                 </div>
             </div>
+            <style>
+            .maintenance-card {
+                background: linear-gradient(
+                    135deg,
+                    rgba(59, 130, 246, 0.1),
+                    rgba(147, 51, 234, 0.1)
+                );
+                border: 1px solid rgba(59, 130, 246, 0.2);
+                border-radius: 15px;
+                padding: 2rem;
+                margin: 1rem 0;
+                color: #e2e8f0;
+            }
+            
+            .maintenance-card h3 {
+                color: #e2e8f0;
+                margin-bottom: 1.5rem;
+                font-size: 1.5rem;
+            }
+            
+            .maintenance-card h4 {
+                color: #94a3b8;
+                margin: 1.5rem 0 0.5rem 0;
+                font-size: 1.1rem;
+            }
+            
+            .status-message {
+                font-size: 1.1rem;
+                line-height: 1.6;
+                margin-bottom: 1.5rem;
+                color: #94a3b8;
+            }
+            
+            .maintenance-details {
+                background: rgba(30, 41, 59, 0.3);
+                border-radius: 10px;
+                padding: 1.5rem;
+                margin: 1rem 0;
+            }
+            
+            .maintenance-list {
+                list-style-type: none;
+                padding-left: 0;
+                margin: 0.5rem 0;
+            }
+            
+            .maintenance-list li {
+                padding: 0.5rem 0;
+                color: #e2e8f0;
+                display: flex;
+                align-items: center;
+            }
+            
+            .maintenance-list li::before {
+                content: "•";
+                color: #3b82f6;
+                font-weight: bold;
+                margin-right: 0.5rem;
+            }
+            
+            .maintenance-progress {
+                width: 100%;
+                height: 4px;
+                background: rgba(59, 130, 246, 0.1);
+                border-radius: 2px;
+                margin-top: 1.5rem;
+                overflow: hidden;
+            }
+            
+            .maintenance-progress .progress-bar {
+                width: 30%;
+                height: 100%;
+                background: linear-gradient(
+                    90deg,
+                    #3b82f6,
+                    #9333ea
+                );
+                animation: progress 2s infinite ease-in-out;
+            }
+            
+            @keyframes progress {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(400%); }
+            }
+            </style>
             """,
             unsafe_allow_html=True
         )
@@ -410,66 +510,58 @@ class PhoenixRisingUI:
                     st.error("Journal entry cannot be empty. Please share your truth.")
     
     async def handle_submission(self, content: str) -> None:
-        """Handle journal entry submission with graceful error handling."""
+        """Handle journal entry submission with enhanced error handling and user feedback."""
         try:
             with st.spinner("🕯️ Transmuting experience into light..."):
                 async with LightBearer() as light_bearer:
-                    # Generate light token using llm_service
                     token, support, using_fallback = await light_bearer.generate_light_token(
                         entry=content,
                         emotion=st.session_state.app_state['current_emotion']
                     )
                     
-                    # Log the token received
                     logger.info(f"Generated Light Token: {token}")
                     
                     if token:
-                        # Store the token in session state
                         st.session_state.app_state['light_tokens'].append(token)
                         
-                        # Display a notice if using fallback responses
                         if using_fallback:
-                            st.info(
-                                "💫 Our sanctuary is providing alternative guidance while "
-                                "maintaining the sacred space of your journey."
-                            )
+                            self.render_service_unavailable_message()
                         
-                        # Display the generated token
-                        st.markdown(
-                            f"""
-                            <div class="light-token">
-                                <h3>✨ Your Light Token</h3>
-                                <p>{token}</p>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                        sentiment_score = light_bearer.last_sentiment_score if light_bearer.last_sentiment_score is not None else 0.0
                         
-                        # Display support message if available
-                        if support:
-                            st.info(support)
-                        
-                        # Store in the database with fallback status and sentiment score
                         try:
+                            # Store in database regardless of fallback status
                             journal_entry = await database.add_journal_entry(
                                 content=content,
                                 token=token,
                                 emotion=st.session_state.app_state['current_emotion'],
                                 using_fallback=using_fallback,
-                                sentiment_score=light_bearer.last_sentiment_score  # Updated line
+                                sentiment_score=sentiment_score
                             )
                             
                             logger.info(f"Journal entry added with ID: {journal_entry.id}")
-                            
-                            # Optionally, fetch and update journey data for analytics
                             await self.update_journey_data()
                             
-                            st.success("Your journal entry has been transformed successfully!")
+                            # Display token after database operation
+                            st.markdown(
+                                f"""
+                                <div class="light-token">
+                                    <h3>✨ Your Light Token</h3>
+                                    <p>{token}</p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                            
+                            if support:
+                                st.info(support, icon="🌟")
                             
                         except Exception as e:
-                            logger.error(f"Database error: {str(e)}")
-                            st.error("An error occurred while saving your journal entry. Please try again.")
-                            # Continue without database storage
+                            logger.error(f"Database error: {str(e)}", exc_info=True)
+                            st.error(
+                                "While your insights have been captured, we encountered a temporary issue "
+                                "with storage. Please try again shortly."
+                            )
                             
         except APIEndpointUnavailableError:
             self.render_service_unavailable_message()
@@ -477,8 +569,8 @@ class PhoenixRisingUI:
             
         except APIConnectionError as e:
             st.error(
-                "Our sanctuary is experiencing a moment of turbulence. "
-                "Like all storms, this too shall pass. Please try again shortly."
+                "Our sanctuary is experiencing a moment of connection difficulty. "
+                "Like all natural cycles, this too shall pass. Please try again shortly."
             )
             logger.error(f"API Connection Error: {str(e)}")
             
@@ -490,74 +582,38 @@ class PhoenixRisingUI:
             logger.error(f"Unexpected Error: {str(e)}")
     
     async def update_journey_data(self) -> None:
-        """Fetch the latest journey data for analytics."""
+        """
+        Update journey data for analytics visualization.
+        
+        This method fetches emotional progression data from the database and updates
+        the session state for visualization in the analytics section.
+        """
         try:
-            # Define the number of days for emotional progression
+            # Define the time window for emotional progression
             days = 30
+            
+            # Fetch progression data from database
             progression = await database.get_emotional_progression(days=days)
+            
+            # Update session state
+            if 'app_state' not in st.session_state:
+                st.session_state.app_state = {}
             st.session_state.app_state['journey_data'] = progression
-            logger.info("Journey data updated for analytics.")
+            
+            logger.info("Journey data successfully updated for analytics visualization")
+            
         except Exception as e:
-            logger.error(f"Error fetching journey data: {str(e)}")
-            st.error("An error occurred while fetching your journey data.")
+            logger.error(f"Error updating journey data: {str(e)}", exc_info=True)
+            # Don't raise the error - allow the application to continue with stale data
+            st.warning(
+                "Analytics data may be temporarily outdated. This will not affect your journaling experience."
+            )
+
     
-    def render_analytics(self) -> None:
-        """Render analytics section."""
-        if st.session_state.app_state['show_analytics']:
-            with st.container():
-                st.markdown(
-                    """
-                    <div class="analytics-card">
-                        <h3>📊 Your Journey Through Light and Shadow</h3>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-                
-                if not st.session_state.app_state['light_tokens']:
-                    st.info("No light tokens generated yet. Start your journey by sharing your truth.")
-                    return
-                
-                # Example Analytics: Sentiment Over Time
-                journey_data = st.session_state.app_state['journey_data']
-                if journey_data:
-                    # Convert journey_data to a DataFrame
-                    import pandas as pd
-                    df = pd.DataFrame(journey_data, columns=['date', 'sentiment'])
-                    df['date'] = pd.to_datetime(df['date'])
-                    
-                    # Line chart for sentiment over time
-                    fig = px.line(
-                        df, 
-                        x='date', 
-                        y='sentiment', 
-                        title='Sentiment Over Time',
-                        labels={
-                            'date': 'Date',
-                            'sentiment': 'Sentiment Score'
-                        },
-                        template='plotly_dark'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Emotion distribution
-                    emotion_counts = df['sentiment'].apply(self.map_sentiment_to_emotion).value_counts().reset_index()
-                    emotion_counts.columns = ['Emotion', 'Count']
-                    
-                    fig2 = px.pie(
-                        emotion_counts, 
-                        names='Emotion', 
-                        values='Count', 
-                        title='Emotion Distribution',
-                        color_discrete_sequence=px.colors.sequential.RdBu
-                    )
-                    st.plotly_chart(fig2, use_container_width=True)
-                    
-                else:
-                    st.info("No journey data available to display analytics.")
-    
-    def map_sentiment_to_emotion(self, score: float) -> str:
+    def map_sentiment_to_emotion(self, score: Optional[float]) -> str:
         """Map sentiment score to emotion category."""
+        if score is None:
+            return "Unknown"
         if score <= -0.5:
             return "Negative"
         elif score <= 0.5:
@@ -632,6 +688,161 @@ class PhoenixRisingUI:
             except Exception as e:
                 logger.error(f"Error fetching recent entries: {str(e)}")
                 st.error("An error occurred while fetching recent journal entries.")
+
+    async def update_journey_data(self) -> None:
+        """
+        Update journey data for analytics visualization.
+        
+        This method fetches emotional progression data from the database and updates
+        the session state for visualization in the analytics section.
+        """
+        try:
+            # Define the time window for emotional progression
+            days = 30
+            
+            # Fetch progression data from database
+            progression = await database.get_emotional_progression(days=days)
+            
+            # Update session state
+            if 'app_state' not in st.session_state:
+                st.session_state.app_state = {}
+            st.session_state.app_state['journey_data'] = progression
+            
+            logger.info("Journey data successfully updated for analytics visualization")
+            
+        except Exception as e:
+            logger.error(f"Error updating journey data: {str(e)}", exc_info=True)
+            # Don't raise the error - allow the application to continue with stale data
+            st.warning(
+                "Analytics data may be temporarily outdated. This will not affect your journaling experience."
+            )
+
+    def render_analytics(self) -> None:
+        """
+        Render the analytics section with emotional journey visualizations.
+        
+        This method creates and displays various visualizations of the user's emotional
+        journey, including sentiment trends and emotion distribution.
+        """
+        if not st.session_state.app_state.get('show_analytics', False):
+            return
+
+        with st.container():
+            st.markdown(
+                """
+                <div class="analytics-card">
+                    <h3>📊 Your Journey Through Light and Shadow</h3>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+            journey_data = st.session_state.app_state.get('journey_data', [])
+            
+            if not journey_data:
+                st.info(
+                    "Your journey analytics will appear here once you begin sharing your experiences."
+                )
+                return
+            
+            try:
+                # Create DataFrame for visualization
+                import pandas as pd
+                df = pd.DataFrame(journey_data, columns=['date', 'sentiment'])
+                df['date'] = pd.to_datetime(df['date'])
+                
+                # Sentiment Trend Visualization
+                fig_sentiment = px.line(
+                    df,
+                    x='date',
+                    y='sentiment',
+                    title='Your Emotional Journey Over Time',
+                    labels={
+                        'date': 'Date',
+                        'sentiment': 'Emotional State'
+                    },
+                    template='plotly_dark'
+                )
+                
+                # Customize the appearance
+                fig_sentiment.update_traces(
+                    line_color='#3b82f6',
+                    line_width=2
+                )
+                fig_sentiment.update_layout(
+                    plot_bgcolor='rgba(30, 41, 59, 0.1)',
+                    paper_bgcolor='rgba(30, 41, 59, 0.1)',
+                    font=dict(color='#e2e8f0'),
+                    xaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(148, 163, 184, 0.1)'),
+                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(148, 163, 184, 0.1)')
+                )
+                st.plotly_chart(fig_sentiment, use_container_width=True)
+                
+                # Emotion Distribution
+                emotions = df['sentiment'].apply(self._map_sentiment_to_emotion)
+                emotion_counts = emotions.value_counts()
+                
+                fig_distribution = px.pie(
+                    values=emotion_counts.values,
+                    names=emotion_counts.index,
+                    title='Distribution of Emotional States',
+                    color_discrete_sequence=['#3b82f6', '#8b5cf6', '#ec4899']
+                )
+                fig_distribution.update_layout(
+                    plot_bgcolor='rgba(30, 41, 59, 0.1)',
+                    paper_bgcolor='rgba(30, 41, 59, 0.1)',
+                    font=dict(color='#e2e8f0')
+                )
+                st.plotly_chart(fig_distribution, use_container_width=True)
+                
+                # Additional insights
+                st.markdown(
+                    """
+                    <div class="analytics-insights">
+                        <h4>Journey Insights</h4>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
+                # Calculate and display insights
+                avg_sentiment = df['sentiment'].mean()
+                sentiment_trend = df['sentiment'].diff().mean()
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric(
+                        "Average Emotional State",
+                        f"{avg_sentiment:.2f}",
+                        f"{sentiment_trend:.2f}"
+                    )
+                with col2:
+                    most_common_emotion = emotions.mode()[0]
+                    st.metric("Predominant State", most_common_emotion)
+                
+            except Exception as e:
+                logger.error(f"Error rendering analytics: {str(e)}", exc_info=True)
+                st.error(
+                    "We encountered an issue displaying your analytics. "
+                    "This is temporary and doesn't affect your journaling experience."
+                )
+    
+    def _map_sentiment_to_emotion(self, score: float) -> str:
+        """
+        Map numerical sentiment scores to emotional states.
+        
+        Args:
+            score: Sentiment score between -1 and 1
+            
+        Returns:
+            String representing the emotional state
+        """
+        if score <= -0.5:
+            return "Introspective"
+        elif score <= 0:
+            return "Balanced"
+        else:
+            return "Illuminated"
     
     def render(self) -> None:
         """Render the complete interface."""

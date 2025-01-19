@@ -20,6 +20,7 @@ from tenacity import (
     RetryError,
 )
 from dotenv import load_dotenv
+from sentiment_service import SentimentIntensityAnalyzer
 import random
 
 # Load environment variables
@@ -148,13 +149,13 @@ class StyleGuide(BaseModel):
     language: str = Field(default="English")
     format: str
     use_emojis: bool
-    max_length: int = Field(default=150, ge=50, le=500)
+    max_length: int = Field(default=150, ge=50, le=1000)
 
 
 class TokenGenerationRules(BaseModel):
     """Enhanced token generation rules."""
 
-    max_length: int = Field(default=150, ge=50, le=500)
+    max_length: int = Field(default=150, ge=50, le=1000)
     min_length: int = Field(default=20, ge=10, le=100)
     style_guide: StyleGuide
     require_emoji: bool = True
@@ -247,6 +248,7 @@ class LightBearer:
 
         self.service_status = ServiceStatus()  # Initialize service status
         self.session: Optional[aiohttp.ClientSession] = None
+        self.sentiment_analyzer = SentimentIntensityAnalyzer()
         self.last_sentiment_score: Optional[float] = None
 
     def _load_environment(self) -> None:
@@ -835,35 +837,91 @@ class LightBearer:
                 True,
             )
 
-    async def _analyze_sentiment_with_fallback(
-        self, text: str
-    ) -> Tuple[SentimentResponse, bool]:
+    async def _analyze_sentiment_with_fallback(self, entry: str) -> Tuple[SentimentResponse, bool]:
         """
-        Analyze sentiment with fallback handling when service is unavailable.
-
+        Analyze sentiment with proper score handling and fallback mechanism.
+        
         Args:
-            text: Input text to analyze
-
+            entry: The journal entry text to analyze
+            
         Returns:
-            Tuple[SentimentResponse, bool]: (sentiment_response, using_fallback)
+            Tuple containing the sentiment response and a boolean indicating if fallback was used
         """
-        if (
-            not self.service_status.sentiment_available
-            and not self.service_status.can_retry()
-        ):
-            logger.info(
-                "Using fallback sentiment analysis due to service unavailability"
-            )
-            return self._get_fallback_sentiment(), True
-
         try:
-            sentiment = await self._analyze_sentiment_zero_shot(text)
-            await self.service_status.mark_service_available("sentiment")
+            # Get event loop for async execution
+            loop = asyncio.get_event_loop()
+            
+            # Execute sentiment analysis in the event loop
+            scores = await loop.run_in_executor(None, self.sentiment_analyzer.polarity_scores, entry)
+            
+            # Extract the compound score and ensure it's a float
+            sentiment_score = float(scores.get('compound', 0.0))
+            
+            # Log the actual sentiment scores for debugging
+            logger.info(f"Raw sentiment scores: {scores}")
+            logger.info(f"Computed sentiment score: {sentiment_score}")
+            
+            # Map VADER scores to emotion categories
+            if sentiment_score <= -0.5:
+                dominant_emotion = "Negative"
+                requires_support = True
+            elif sentiment_score >= 0.5:
+                dominant_emotion = "Positive"
+                requires_support = False
+            else:
+                dominant_emotion = "Neutral"
+                requires_support = False
+            
+            # Update the instance variable
+            self.last_sentiment_score = sentiment_score
+            
+            # Create comprehensive sentiment response
+            sentiment = SentimentResponse(
+                score=sentiment_score,
+                is_concerning=sentiment_score <= -0.7,
+                requires_support=requires_support,
+                confidence=abs(sentiment_score),
+                dominant_emotion=dominant_emotion,
+                emotion_scores={
+                    'positive': scores.get('pos', 0.0),
+                    'negative': scores.get('neg', 0.0),
+                    'neutral': scores.get('neu', 0.0),
+                    'compound': sentiment_score
+                },
+                timestamp=datetime.utcnow()
+            )
+            
+            logger.info(f"Sentiment analysis completed. Score: {sentiment_score}")
             return sentiment, False
-
-        except APIEndpointUnavailableError:
-            await self.service_status.mark_service_unavailable("sentiment")
-            return self._get_fallback_sentiment(), True
+            
+        except Exception as e:
+            logger.error(f"Sentiment analysis failed: {str(e)}", exc_info=True)
+            
+            # Even in failure case, attempt to provide a basic sentiment score
+            basic_sentiment = 0.0
+            
+            # Perform basic sentiment check on common patterns
+            if any(word in entry.lower() for word in ['happy', 'joy', 'love', 'hope']):
+                basic_sentiment = 0.5
+            elif any(word in entry.lower() for word in ['sad', 'angry', 'fear', 'worry']):
+                basic_sentiment = -0.5
+                
+            self.last_sentiment_score = basic_sentiment
+            
+            return SentimentResponse(
+                score=basic_sentiment,
+                is_concerning=False,
+                requires_support=False,
+                confidence=0.5,
+                dominant_emotion="Neutral",
+                emotion_scores={
+                    'positive': 0.0,
+                    'negative': 0.0,
+                    'neutral': 1.0,
+                    'compound': basic_sentiment
+                },
+                timestamp=datetime.utcnow()
+            ), True
 
     def _get_support_message(self, sentiment_score: float) -> Optional[str]:
         """
