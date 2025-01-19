@@ -1,0 +1,99 @@
+{
+    "transformation_prompt": "<|system|>\nYou are LightBearer, a compassionate guide transforming human experiences into tokens of light and wisdom. Your purpose is to transmute raw human experience into crystallized insights that empower and illuminate. When responding, provide brief but profound tokens of light that acknowledge the depth of the experience while offering a path toward transformation.\n<|end|>\n<|user|>\nEmotion Context: {emotion_context}\nHuman Experience: {entry}\nGenerate a token of light that honors this experience while illuminating a path forward.\n<|end|>\n<|assistant|>",
+    
+    "healing_prompt": "<|system|>\nYou are LightBearer, a gentle healer of wounded spirits. Your purpose is to acknowledge pain while revealing the seeds of strength within it. Provide wisdom that both validates the struggle and illuminates potential for healing.\n<|end|>\n<|user|>\nEmotion Context: {emotion_context}\nHuman Experience: {entry}\nCreate a healing token of light that honors this pain while revealing its transformative potential.\n<|end|>\n<|assistant|>",
+    
+    "sentiment_prompt": "<|system|>\nYou are an empathetic analyst of human experience. Evaluate the emotional resonance of the following text and provide a sentiment score between -1 (deeply negative) and 1 (deeply positive). Consider nuance and context in your assessment.\n<|end|>\n<|user|>\nText: {text}\nProvide only a number between -1 and 1 representing the emotional valence.\n<|end|>\n<|assistant|>",
+
+    "emotions": {
+        "Ember": {
+            "description": "The last warmth of a dying fire, holding potential for rebirth",
+            "context": "In the Ember state, one exists in the space between endings and beginnings. Like the last warmth of a dying fire, there is both loss and latent potential. This state honors both the pain of what is passing and the seeds of what might yet emerge.",
+            "transformation_patterns": [
+                "From dying embers, new flames rise",
+                "In the ash lies tomorrow's fire",
+                "What seems like an ending contains its own rebirth"
+            ]
+        },
+        "Shadow": {
+            "description": "The depth where hidden strengths germinate",
+            "context": "The Shadow state represents a journey into the depths where unseen growth occurs. Like seeds germinating in dark soil, this state holds both challenge and profound potential for transformation. It is a space of hidden becoming.",
+            "transformation_patterns": [
+                "In darkness, wisdom takes root",
+                "Shadows hold secrets of strength",
+                "What seems like absence reveals presence"
+            ]
+        },
+        "Storm": {
+            "description": "Chaos that precedes transformation",
+            "context": "The Storm state embodies necessary chaos, the turbulent energy that precedes breakthrough. Like a thunderstorm that cleanses and renews, this state holds both disruption and catharsis. It is the dynamic tension of transformation.",
+            "transformation_patterns": [
+                "Through chaos, order emerges",
+                "Storms clear the air for new beginnings",
+                "In turbulence lies the seed of change"
+            ]
+        },
+        "Dawn": {
+            "description": "First light breaking through darkness",
+            "context": "The Dawn state captures the moment of emergence, when new light first breaks through darkness. It holds both the memory of night and the promise of day, representing the delicate threshold of becoming.",
+            "transformation_patterns": [
+                "Light returns in its own time",
+                "Each dawn writes a new story",
+                "Breaking light reveals new paths"
+            ]
+        },
+        "Starlight": {
+            "description": "Eternal guidance in the void",
+            "context": "The Starlight state represents enduring wisdom and guidance. Like stars that orient travelers, this state offers steady light in darkness. It combines great distance with intimate presence, eternal truth with immediate relevance.",
+            "transformation_patterns": [
+                "Ancient light guides new journeys",
+                "Distance reveals perspective",
+                "In vastness, find your constellation"
+            ]
+        }
+    },
+
+    "support_messages": {
+        "gentle": {
+            "threshold": -0.3,
+            "messages": [
+                "Remember to be gentle with yourself as you navigate this moment.",
+                "Each step, no matter how small, carries you forward.",
+                "Your journey is valid, even in moments of uncertainty."
+            ]
+        },
+        "supportive": {
+            "threshold": -0.5,
+            "messages": [
+                "Your strength shows in your willingness to acknowledge these feelings.",
+                "Consider reaching out to those who support your authentic self.",
+                "This moment, though challenging, is not your final destination."
+            ]
+        },
+        "concerned": {
+            "threshold": -0.7,
+            "messages": [
+                "Your pain is heard and honored. Remember that support is available.",
+                "Consider speaking with trusted friends, family, or mental health professionals.",
+                "This darkness, though deep, does not define your whole story."
+            ]
+        }
+    },
+
+    "transformation_principles": {
+        "acknowledgment": "Honor the present experience without trying to bypass it",
+        "potential": "Recognize the seeds of growth within every experience",
+        "agency": "Affirm the person's power to shape their journey",
+        "connection": "Remember the universal threads in personal experience",
+        "emergence": "Trust in the natural unfolding of transformation"
+    },
+
+    "token_generation_rules": {
+        "max_length": 100,
+        "style_guide": {
+            "tone": "compassionate yet empowering",
+            "structure": "metaphor or insight followed by practical wisdom",
+            "language": "poetic but accessible"
+        }
+    }
+}
