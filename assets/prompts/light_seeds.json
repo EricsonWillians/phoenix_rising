@@ -1,99 +1,105 @@
 {
-    "transformation_prompt": "<|system|>\nYou are LightBearer, a compassionate guide transforming human experiences into tokens of light and wisdom. Your purpose is to transmute raw human experience into crystallized insights that empower and illuminate. When responding, provide brief but profound tokens of light that acknowledge the depth of the experience while offering a path toward transformation.\n<|end|>\n<|user|>\nEmotion Context: {emotion_context}\nHuman Experience: {entry}\nGenerate a token of light that honors this experience while illuminating a path forward.\n<|end|>\n<|assistant|>",
-    
-    "healing_prompt": "<|system|>\nYou are LightBearer, a gentle healer of wounded spirits. Your purpose is to acknowledge pain while revealing the seeds of strength within it. Provide wisdom that both validates the struggle and illuminates potential for healing.\n<|end|>\n<|user|>\nEmotion Context: {emotion_context}\nHuman Experience: {entry}\nCreate a healing token of light that honors this pain while revealing its transformative potential.\n<|end|>\n<|assistant|>",
-    
-    "sentiment_prompt": "<|system|>\nYou are an empathetic analyst of human experience. Evaluate the emotional resonance of the following text and provide a sentiment score between -1 (deeply negative) and 1 (deeply positive). Consider nuance and context in your assessment.\n<|end|>\n<|user|>\nText: {text}\nProvide only a number between -1 and 1 representing the emotional valence.\n<|end|>\n<|assistant|>",
-
+    "transformation_prompt": "<|user|>\nEmotion Context: {emotion_context}\nJournal Entry: {entry}\nGenerate a concise and uplifting token of light that honors this experience in under 150 words.\n<|assistant|>",
+    "healing_prompt": "You are a compassionate healer guiding users through their emotional journeys with wisdom and empathy.",
+    "sentiment_prompt": "Analyze the sentiment of the following text.",
     "emotions": {
-        "Ember": {
-            "description": "The last warmth of a dying fire, holding potential for rebirth",
-            "context": "In the Ember state, one exists in the space between endings and beginnings. Like the last warmth of a dying fire, there is both loss and latent potential. This state honors both the pain of what is passing and the seeds of what might yet emerge.",
-            "transformation_patterns": [
-                "From dying embers, new flames rise",
-                "In the ash lies tomorrow's fire",
-                "What seems like an ending contains its own rebirth"
-            ]
-        },
-        "Shadow": {
-            "description": "The depth where hidden strengths germinate",
-            "context": "The Shadow state represents a journey into the depths where unseen growth occurs. Like seeds germinating in dark soil, this state holds both challenge and profound potential for transformation. It is a space of hidden becoming.",
-            "transformation_patterns": [
-                "In darkness, wisdom takes root",
-                "Shadows hold secrets of strength",
-                "What seems like absence reveals presence"
-            ]
-        },
-        "Storm": {
-            "description": "Chaos that precedes transformation",
-            "context": "The Storm state embodies necessary chaos, the turbulent energy that precedes breakthrough. Like a thunderstorm that cleanses and renews, this state holds both disruption and catharsis. It is the dynamic tension of transformation.",
-            "transformation_patterns": [
-                "Through chaos, order emerges",
-                "Storms clear the air for new beginnings",
-                "In turbulence lies the seed of change"
-            ]
-        },
         "Dawn": {
-            "description": "First light breaking through darkness",
-            "context": "The Dawn state captures the moment of emergence, when new light first breaks through darkness. It holds both the memory of night and the promise of day, representing the delicate threshold of becoming.",
+            "name": "Dawn",
+            "description": "The beginning of a new day.",
+            "context": "Symbolizes hope, renewal, and new beginnings.",
             "transformation_patterns": [
-                "Light returns in its own time",
-                "Each dawn writes a new story",
-                "Breaking light reveals new paths"
-            ]
+                "Acknowledgment: Recognizing the start of a new journey.",
+                "Potential: Identifying opportunities for growth and renewal.",
+                "Agency: Empowering action towards positive change."
+            ],
+            "generation_parameters": {
+                "temperature": 0.6,
+                "top_p": 0.7,
+                "repetition_penalty": 3.0,
+                "do_sample": false
+            }
         },
-        "Starlight": {
-            "description": "Eternal guidance in the void",
-            "context": "The Starlight state represents enduring wisdom and guidance. Like stars that orient travelers, this state offers steady light in darkness. It combines great distance with intimate presence, eternal truth with immediate relevance.",
+        "Twilight": {
+            "name": "Twilight",
+            "description": "The period between daylight and darkness.",
+            "context": "Represents reflection, transition, and the balance between light and shadow.",
             "transformation_patterns": [
-                "Ancient light guides new journeys",
-                "Distance reveals perspective",
-                "In vastness, find your constellation"
-            ]
+                "Acknowledgment: Embracing the balance between light and shadow.",
+                "Potential: Finding peace in transitions and change.",
+                "Agency: Encouraging thoughtful reflection and mindful action."
+            ],
+            "generation_parameters": {
+                "temperature": 0.65,
+                "top_p": 0.75,
+                "repetition_penalty": 2.8,
+                "do_sample": false
+            }
+        },
+        "Midnight": {
+            "name": "Midnight",
+            "description": "The darkest part of the night.",
+            "context": "Embodies deep introspection, resilience, and the strength to overcome challenges.",
+            "transformation_patterns": [
+                "Acknowledgment: Facing and accepting inner darkness.",
+                "Potential: Unearthing hidden strengths and resilience.",
+                "Agency: Inspiring perseverance and inner strength."
+            ],
+            "generation_parameters": {
+                "temperature": 0.6,
+                "top_p": 0.7,
+                "repetition_penalty": 3.0,
+                "do_sample": false
+            }
+        },
+        "Noon": {
+            "name": "Noon",
+            "description": "The peak of daylight.",
+            "context": "Symbolizes clarity, energy, and the height of personal strength.",
+            "transformation_patterns": [
+                "Acknowledgment: Recognizing personal strengths and clarity.",
+                "Potential: Leveraging energy for positive outcomes.",
+                "Agency: Taking decisive action towards goals."
+            ],
+            "generation_parameters": {
+                "temperature": 0.6,
+                "top_p": 0.7,
+                "repetition_penalty": 3.0,
+                "do_sample": false
+            }
         }
     },
-
     "support_messages": {
-        "gentle": {
-            "threshold": -0.3,
-            "messages": [
-                "Remember to be gentle with yourself as you navigate this moment.",
-                "Each step, no matter how small, carries you forward.",
-                "Your journey is valid, even in moments of uncertainty."
-            ]
-        },
-        "supportive": {
+        "low": {
             "threshold": -0.5,
             "messages": [
-                "Your strength shows in your willingness to acknowledge these feelings.",
-                "Consider reaching out to those who support your authentic self.",
-                "This moment, though challenging, is not your final destination."
+                "It's okay to feel this way. Remember, you're not alone.",
+                "Take a moment for yourself. Healing takes time.",
+                "Your feelings are valid. Reach out if you need support."
             ]
         },
-        "concerned": {
-            "threshold": -0.7,
+        "medium": {
+            "threshold": -1.0,
             "messages": [
-                "Your pain is heard and honored. Remember that support is available.",
-                "Consider speaking with trusted friends, family, or mental health professionals.",
-                "This darkness, though deep, does not define your whole story."
+                "Reach out to someone you trust. Support is available.",
+                "Consider talking to a professional if you're feeling overwhelmed.",
+                "You're stronger than you think. Don't hesitate to seek help."
             ]
         }
     },
-
     "transformation_principles": {
-        "acknowledgment": "Honor the present experience without trying to bypass it",
-        "potential": "Recognize the seeds of growth within every experience",
-        "agency": "Affirm the person's power to shape their journey",
-        "connection": "Remember the universal threads in personal experience",
-        "emergence": "Trust in the natural unfolding of transformation"
+        "acknowledgment": "Recognize and accept the current emotional state with compassion.",
+        "potential": "Identify opportunities for growth and renewal within the experience.",
+        "agency": "Empower oneself to take proactive steps towards positive change.",
+        "connection": "Foster connections that support emotional well-being and resilience.",
+        "emergence": "Allow new insights and strengths to emerge from challenges and reflections."
     },
-
     "token_generation_rules": {
-        "max_length": 100,
+        "max_length": 150,
         "style_guide": {
-            "tone": "compassionate yet empowering",
-            "structure": "metaphor or insight followed by practical wisdom",
-            "language": "poetic but accessible"
+            "tone": "compassionate",
+            "language": "English",
+            "format": "text",
+            "use_emojis": true
         }
     }
 }

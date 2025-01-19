@@ -2,21 +2,35 @@
 Phoenix Rising Main Application.
 
 This module serves as the entry point for the Phoenix Rising sanctuary,
-integrating all components into a cohesive interface that provides users
-with a space for reflection and growth away from corporate mechanization.
+creating a serene and professional interface for emotional transformation.
 """
 
+import sys
+from pathlib import Path
 import asyncio
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, Any
 import logging
+from logging.handlers import RotatingFileHandler
+import traceback
+from functools import wraps
 
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from sqlalchemy.ext.asyncio import AsyncSession
+import extra_streamlit_components as stx
 
-from src.llm_service import LightBearer, LightBearerException
+# Add project root to Python path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.llm_service import (
+    LightBearer,
+    LightBearerException,
+    APIConnectionError,
+    APIEndpointUnavailableError
+)
 from src.database import DatabaseManager, get_db
 from src.schemas import (
     EmotionState,
@@ -24,324 +38,548 @@ from src.schemas import (
     JournalEntryResponse,
     EmotionalProgression
 )
-from src.utils import (
-    Journey,
-    DataProcessor,
-    ApplicationConfig,
-    setup_error_handling
-)
+from src.utils import Journey, DataProcessor, ApplicationConfig
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=3)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
-# Load configuration
-config = ApplicationConfig()
+def inject_custom_css() -> None:
+    """Inject custom CSS for enhanced visual design."""
+    st.markdown("""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Raleway:wght@300;400;500&display=swap');
+        
+        /* Global Styles */
+        .stApp {
+            background: linear-gradient(
+                135deg,
+                #0f172a 0%,
+                #1e293b 50%,
+                #0f172a 100%
+            ) !important;
+            font-family: 'Raleway', sans-serif;
+        }
+        
+        /* Typography */
+        h1, h2, h3 {
+            font-family: 'Cinzel', serif !important;
+            color: #e2e8f0 !important;
+            letter-spacing: 0.05em !important;
+        }
+        
+        .app-title {
+            font-size: 3.5rem !important;
+            font-weight: 600 !important;
+            background: linear-gradient(120deg, #e2e8f0, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem !important;
+        }
+        
+        .subtitle {
+            font-family: 'Raleway', sans-serif !important;
+            font-size: 1.2rem !important;
+            color: #94a3b8 !important;
+            font-weight: 300 !important;
+            letter-spacing: 0.1em !important;
+            line-height: 1.6 !important;
+        }
+        
+        /* Cards and Containers */
+        .content-card {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 1rem 0;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .content-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Form Elements */
+        .stTextInput > div > div, .stTextArea > div > div {
+            background: rgba(30, 41, 59, 0.8) !important;
+            border: 1px solid rgba(148, 163, 184, 0.3) !important;
+            border-radius: 10px !important;
+            color: #e2e8f0 !important;
+            font-family: 'Raleway', sans-serif !important;
+            font-size: 1rem !important;
+        }
+        
+        /* Buttons */
+        .stButton > button {
+            width: 100%;
+            background: linear-gradient(
+                135deg,
+                #3b82f6 0%,
+                #2563eb 100%
+            ) !important;
+            color: white !important;
+            border: none !important;
+            padding: 0.75rem 2rem !important;
+            border-radius: 25px !important;
+            font-family: 'Raleway', sans-serif !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.05em !important;
+            text-transform: uppercase !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .stButton > button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.5) !important;
+        }
+        
+        /* Light Tokens */
+        .light-token {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 1rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .light-token::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(59, 130, 246, 0.5),
+                transparent
+            );
+        }
+        
+        .light-token h3 {
+            font-family: 'Cinzel', serif !important;
+            color: #3b82f6 !important;
+            margin-bottom: 1rem !important;
+        }
+        
+        .light-token p {
+            font-family: 'Raleway', sans-serif !important;
+            color: #e2e8f0 !important;
+            font-style: italic !important;
+            line-height: 1.6 !important;
+        }
+        
+        /* Sidebar */
+        .css-1d391kg {
+            background: rgba(15, 23, 42, 0.9) !important;
+            backdrop-filter: blur(10px) !important;
+        }
+        
+        /* Analytics */
+        .analytics-card {
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            color: #e2e8f0 !important;
+        }
+        
+        /* Emotion Selector */
+        .emotion-selector {
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            color: #e2e8f0 !important;
+        }
+        
+        .stSlider > div > div > div {
+            background: linear-gradient(
+                90deg,
+                #ef4444,
+                #8b5cf6,
+                #3b82f6,
+                #22c55e
+            ) !important;
+        }
+                
+        .maintenance-card {
+            background: linear-gradient(
+                135deg,
+                rgba(59, 130, 246, 0.1),
+                rgba(147, 51, 234, 0.1)
+            );
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 1rem 0;
+            text-align: center;
+            color: #e2e8f0 !important;
+        }
 
-class PhoenixRisingApp:
-    """Main application class for Phoenix Rising sanctuary."""
+        .maintenance-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 2px;
+            margin-top: 1.5rem;
+            overflow: hidden;
+        }
+
+        .maintenance-progress .progress-bar {
+            width: 30%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                #3b82f6,
+                #9333ea
+            );
+            animation: progress 2s infinite ease-in-out;
+        }
+
+        @keyframes progress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+        }
+
+        /* Enhanced Contrast for Text and Backgrounds */
+        .stTextInput > div > div, .stTextArea > div > div {
+            color: #e2e8f0 !important;
+        }
+
+        .light-token p, .analytics-card p, .emotion-selector p {
+            color: #e2e8f0 !important;
+        }
+
+        /* Tooltip Styling */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #1e293b;
+            color: #e2e8f0;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* Position above the text */
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+class PhoenixRisingUI:
+    """Main UI component class for Phoenix Rising."""
     
     def __init__(self):
-        """Initialize application components and state."""
-        self.setup_streamlit_config()
-        self.initialize_session_state()
-        self.database = DatabaseManager()
-        self.setup_page_styling()
-
-    def setup_streamlit_config(self) -> None:
+        """Initialize UI components."""
+        self.setup_page_config()
+        inject_custom_css()
+        self.init_session_state()
+        self.db_manager = DatabaseManager()
+        self.config = ApplicationConfig()
+    
+    def setup_page_config(self) -> None:
         """Configure Streamlit page settings."""
         st.set_page_config(
             page_title="Phoenix Rising | Digital Sanctuary",
             page_icon="🔥",
-            layout="centered",
+            layout="wide",
             initial_sidebar_state="expanded"
         )
-
-    def initialize_session_state(self) -> None:
-        """Initialize Streamlit session state variables."""
-        if 'light_tokens' not in st.session_state:
-            st.session_state.light_tokens = []
-        if 'current_emotion' not in st.session_state:
-            st.session_state.current_emotion = EmotionState.DAWN
-        if 'show_analytics' not in st.session_state:
-            st.session_state.show_analytics = False
-
-    def setup_page_styling(self) -> None:
-        """Apply custom styling to the interface."""
-        st.markdown("""
-            <style>
-            .stApp {
-                background: linear-gradient(
-                    135deg,
-                    #1a1a2e 0%,
-                    #16213e 50%,
-                    #1a1a2e 100%
-                );
-                color: #e2e2e2;
+    
+    def init_session_state(self) -> None:
+        """Initialize session state variables."""
+        if 'app_state' not in st.session_state:
+            st.session_state.app_state = {
+                'light_tokens': [],
+                'current_emotion': EmotionState.DAWN,
+                'show_analytics': False,
+                'theme': 'dark',
+                'journey_data': []
             }
-            .element-container {
-                background: rgba(255, 255, 255, 0.05);
-                border-radius: 15px;
-                padding: 1rem;
-                margin: 1rem 0;
-            }
-            .stTextInput, .stTextArea {
-                background-color: rgba(255, 255, 255, 0.05) !important;
-                border-radius: 10px !important;
-                border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            }
-            .stButton > button {
-                background: linear-gradient(
-                    45deg,
-                    #4a90e2,
-                    #67b26f
-                ) !important;
-                color: white !important;
-                border: none !important;
-                padding: 0.75rem 2rem !important;
-                border-radius: 25px !important;
-                transition: all 0.3s ease !important;
-            }
-            .stButton > button:hover {
-                transform: translateY(-2px) !important;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.2) !important;
-            }
-            .light-token {
-                background: rgba(74, 144, 226, 0.1);
-                padding: 2rem;
-                border-radius: 15px;
-                border: 1px solid rgba(74, 144, 226, 0.2);
-                margin: 1rem 0;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-    async def process_journal_entry(
-        self,
-        content: str,
-        emotion: EmotionState,
-        db_session: AsyncSession
-    ) -> Tuple[Optional[str], Optional[str]]:
-        """
-        Process a journal entry and generate a light token.
-        
-        Args:
-            content: Journal entry text
-            emotion: Selected emotion
-            db_session: Database session
-            
-        Returns:
-            Tuple of (light token, optional support message)
-        """
-        async with LightBearer() as light_bearer:
-            try:
-                # Generate light token
-                token, support_message = await light_bearer.generate_light_token(
-                    entry=content,
-                    emotion=emotion
-                )
-                
-                if token:
-                    # Create database entry
-                    entry = JournalEntryCreate(
-                        content=content,
-                        emotion=emotion,
-                        light_token=token,
-                        sentiment_score=light_bearer.last_sentiment_score
-                    )
-                    
-                    await self.database.create_journal_entry(
-                        entry,
-                        db_session
-                    )
-                    st.session_state.light_tokens.append(token)
-                    
-                return token, support_message
-                
-            except LightBearerException as e:
-                logger.error(f"Error generating light token: {e}")
-                return None, str(e)
-
-    def render_emotion_selector(self) -> None:
-        """Render the emotion selection interface."""
-        st.markdown("### 🌟 How does your soul feel today?")
-        
-        emotion = st.select_slider(
-            "",
-            options=[e.value for e in EmotionState],
-            value=st.session_state.current_emotion.value,
-            format_func=lambda x: f"{x} - {EmotionState.get_description(x)}"
+    
+    def render_header(self) -> None:
+        """Render application header."""
+        st.markdown(
+            f"""
+            <h1 class="app-title">Phoenix Rising 🔥</h1>
+            <p class="subtitle">
+                A sanctuary against the machine,<br>where every wound becomes light.
+            </p>
+            """,
+            unsafe_allow_html=True
         )
-        
-        st.session_state.current_emotion = EmotionState(emotion)
-
-    def render_journal_entry(self) -> None:
-        """Render the journal entry interface."""
-        st.markdown("### 📝 Share your truth")
-        
-        with st.form("journal_entry", clear_on_submit=True):
-            content = st.text_area(
-                "",
-                height=150,
-                placeholder=(
-                    "Let your thoughts flow freely in this protected space..."
-                ),
-                max_chars=config.max_entry_length
+    
+    def render_service_unavailable_message(self) -> None:
+        """Render a professional service unavailability message."""
+        st.markdown(
+            """
+            <div class="maintenance-card">
+                <h3>🌅 Service Restoration in Progress</h3>
+                <p>
+                    Our sanctuary is briefly entering a period of rest to conserve resources. 
+                    Like the phoenix itself, our service occasionally needs moments of 
+                    quietude before rising anew.
+                </p>
+                <p>
+                    Please try again in a few moments. Your patience allows us to maintain 
+                    this space as a sustainable refuge for all who seek it.
+                </p>
+                <div class="maintenance-progress">
+                    <div class="progress-bar"></div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    def render_emotion_selector(self) -> None:
+        """Render emotion selection interface."""
+        with st.container():
+            st.markdown(
+                """
+                <div class="emotion-selector">
+                    <h3>🌟 How does your soul feel today?</h3>
+                </div>
+                """,
+                unsafe_allow_html=True
             )
             
-            cols = st.columns([3, 1])
-            with cols[0]:
+            emotion = st.select_slider(
+                "Select Your Emotion",
+                options=[e.value for e in EmotionState],
+                value=st.session_state.app_state['current_emotion'].value,
+                format_func=lambda x: f"{x} - {EmotionState.get_description(x)}",
+                help="Choose the emotion that best describes your current state.",
+                label_visibility='visible'  # Ensure label is visible
+            )
+            
+            st.session_state.app_state['current_emotion'] = EmotionState(emotion)
+    
+    def render_journal_section(self) -> None:
+        """Render journal entry section."""
+        with st.container():
+            st.markdown(
+                """
+                <div class="content-card">
+                    <h3>📝 Share your truth</h3>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+            with st.form("journal_entry", clear_on_submit=True):
+                content = st.text_area(
+                    "Your Journal Entry",
+                    height=150,
+                    placeholder=(
+                        "Let your thoughts flow freely in this protected space..."
+                    ),
+                    max_chars=self.config.max_entry_length,
+                    label_visibility='visible'  # Ensure label is visible
+                )
+                
                 submitted = st.form_submit_button(
                     "Transform 🔥",
                     use_container_width=True
                 )
                 
-            if submitted and content:
-                self.handle_journal_submission(content)
-
-    async def handle_journal_submission(self, content: str) -> None:
-        """Handle journal entry submission and token generation."""
-        with st.spinner("Transmuting experience into light..."):
-            db_session = await get_db().__anext__()
-            token, support = await self.process_journal_entry(
-                content,
-                st.session_state.current_emotion,
-                db_session
-            )
+                if submitted and content:
+                    asyncio.run(self.handle_submission(content))
+    
+    async def handle_submission(self, content: str) -> None:
+        """Handle journal entry submission with graceful error handling."""
+        try:
+            with st.spinner("🕯️ Transmuting experience into light..."):
+                async with LightBearer() as light_bearer:
+                    token, support = await light_bearer.generate_light_token(
+                        entry=content,
+                        emotion=st.session_state.app_state['current_emotion']
+                    )
+                    
+                    if token:
+                        # Store the token in session state
+                        st.session_state.app_state['light_tokens'].append(token)
+                        
+                        # Optionally, store in the database
+                        # await self.db_manager.add_journal_entry(content, token, st.session_state.app_state['current_emotion'])
+                        
+                        st.markdown(
+                            f"""
+                            <div class="light-token">
+                                <h3>✨ Your Light Token</h3>
+                                <p>{token}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                        
+                        if support:
+                            st.info(support)
+                            
+        except APIEndpointUnavailableError:
+            self.render_service_unavailable_message()
             
-            if token:
+        except APIConnectionError as e:
+            st.error(
+                "Our sanctuary is experiencing a moment of turbulence. "
+                "Like all storms, this too shall pass. Please try again shortly."
+            )
+            logger.error(f"API Connection Error: {str(e)}")
+            
+        except LightBearerException as e:
+            st.error(
+                "An unexpected disturbance affects our sacred space. "
+                "We are working to restore harmony."
+            )
+            logger.error(f"Unexpected Error: {str(e)}")
+    
+    def render_analytics(self) -> None:
+        """Render analytics section."""
+        if st.session_state.app_state['show_analytics']:
+            with st.container():
                 st.markdown(
-                    f"""
-                    <div class='light-token'>
-                        <h3>✨ Your Light Token</h3>
-                        <p style='font-size: 1.1em; font-style: italic;'>
-                        {token}
-                        </p>
+                    """
+                    <div class="analytics-card">
+                        <h3>📊 Your Journey Through Light and Shadow</h3>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
                 
-                if support:
-                    st.info(support)
-            else:
-                st.error(
-                    "The light dims momentarily. Please try again later."
-                )
-
-    def render_journey_analytics(self) -> None:
-        """Render journey analytics visualization."""
-        if not st.session_state.show_analytics:
-            return
-            
-        st.markdown("### 📊 Your Journey Through Light and Shadow")
-        
-        async def load_analytics():
-            db_session = await get_db().__anext__()
-            progression = await self.database.get_emotional_progression(
-                db_session,
-                days=30
-            )
-            return progression
-        
-        progression = asyncio.run(load_analytics())
-        
-        if progression:
-            fig = self.create_journey_visualization(progression)
-            st.plotly_chart(fig, use_container_width=True)
-
-    def create_journey_visualization(
-        self,
-        progression: EmotionalProgression
-    ) -> go.Figure:
-        """Create journey visualization using Plotly."""
-        fig = go.Figure()
-        
-        # Add emotional journey line
-        fig.add_trace(go.Scatter(
-            x=[p['date'] for p in progression],
-            y=[p['sentiment'] for p in progression],
-            mode='lines+markers',
-            name='Emotional Journey',
-            line=dict(color='#4a90e2', width=2),
-            marker=dict(
-                size=8,
-                color=[
-                    '#ff6b6b' if p['emotion'] == EmotionState.EMBER else
-                    '#4a4e69' if p['emotion'] == EmotionState.SHADOW else
-                    '#4361ee' if p['emotion'] == EmotionState.STORM else
-                    '#ff9e64' if p['emotion'] == EmotionState.DAWN else
-                    '#9d4edd'
-                    for p in progression
-                ]
-            )
-        ))
-        
-        fig.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0.1)',
-            font=dict(color='#e2e2e2'),
-            xaxis=dict(
-                showgrid=True,
-                gridwidth=1,
-                gridcolor='rgba(255,255,255,0.1)'
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridwidth=1,
-                gridcolor='rgba(255,255,255,0.1)',
-                range=[-1, 1]
-            ),
-            showlegend=False
-        )
-        
-        return fig
-
+                if not st.session_state.app_state['light_tokens']:
+                    st.info("No light tokens generated yet. Start your journey by sharing your truth.")
+                    return
+                
+                # Example Analytics: Sentiment Over Time
+                # Assuming journey_data contains tuples of (timestamp, sentiment_score)
+                # Replace this with actual data from your database or state
+                journey_data = st.session_state.journey_data
+                if journey_data:
+                    # Convert journey_data to a DataFrame
+                    import pandas as pd
+                    df = pd.DataFrame(journey_data, columns=['timestamp', 'sentiment_score'])
+                    df['timestamp'] = pd.to_datetime(df['timestamp'])
+                    
+                    # Line chart for sentiment over time
+                    fig = px.line(
+                        df, 
+                        x='timestamp', 
+                        y='sentiment_score', 
+                        title='Sentiment Over Time',
+                        labels={
+                            'timestamp': 'Date',
+                            'sentiment_score': 'Sentiment Score'
+                        },
+                        template='plotly_dark'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Emotion distribution
+                    emotion_counts = df['sentiment_score'].apply(self.map_sentiment_to_emotion).value_counts().reset_index()
+                    emotion_counts.columns = ['Emotion', 'Count']
+                    
+                    fig2 = px.pie(
+                        emotion_counts, 
+                        names='Emotion', 
+                        values='Count', 
+                        title='Emotion Distribution',
+                        color_discrete_sequence=px.colors.sequential.RdBu
+                    )
+                    st.plotly_chart(fig2, use_container_width=True)
+                    
+                else:
+                    st.info("No journey data available to display analytics.")
+    
+    def map_sentiment_to_emotion(self, score: float) -> str:
+        """Map sentiment score to emotion category."""
+        if score <= -0.5:
+            return "Negative"
+        elif score <= 0.5:
+            return "Neutral"
+        else:
+            return "Positive"
+    
     def render_sidebar(self) -> None:
         """Render application sidebar."""
         with st.sidebar:
             st.markdown("### 🌅 Journey Settings")
             
-            st.toggle(
+            show_analytics = st.checkbox(
                 "Show Analytics",
-                value=st.session_state.show_analytics,
-                key="show_analytics"
+                value=st.session_state.app_state['show_analytics'],
+                help="Toggle to display your emotional analytics."
             )
             
-            if st.session_state.light_tokens:
-                st.markdown("### 🌟 Recent Light Tokens")
+            st.session_state.app_state['show_analytics'] = show_analytics
+            
+            if st.session_state.app_state['light_tokens']:
+                st.markdown(
+                    """
+                    <div class="content-card">
+                        <h3>🌟 Recent Light Tokens</h3>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
                 for token in reversed(
-                    st.session_state.light_tokens[-5:]
+                    st.session_state.app_state['light_tokens'][-5:]
                 ):
                     st.markdown(
                         f"""
-                        <div style='font-size: 0.9em; opacity: 0.8; 
-                                 margin-bottom: 1rem;'>
-                            "{token}"
+                        <div class="light-token">
+                            <p>{token}</p>
                         </div>
                         """,
                         unsafe_allow_html=True
                     )
-
-    def run(self) -> None:
-        """Run the Phoenix Rising application."""
-        st.title("🔥 Phoenix Rising")
-        st.markdown("""
-            <p style='font-size: 1.2em; font-style: italic; opacity: 0.8;'>
-            A sanctuary against the machine, where every wound becomes light.
-            </p>
-        """, unsafe_allow_html=True)
+    
+    def render(self) -> None:
+        """Render the complete interface."""
+        self.render_header()
         
-        # Initialize database
-        asyncio.run(self.database.create_tables())
+        # Main content
+        col1, col2 = st.columns([2, 1])
         
-        # Render interface components
-        self.render_emotion_selector()
-        self.render_journal_entry()
-        self.render_journey_analytics()
+        with col1:
+            self.render_emotion_selector()
+            self.render_journal_section()
+            
+        with col2:
+            self.render_analytics()
+            
         self.render_sidebar()
 
+def main() -> None:
+    """Main application entry point."""
+    ui = PhoenixRisingUI()
+    ui.render()
+
 if __name__ == "__main__":
-    setup_error_handling()
-    app = PhoenixRisingApp()
-    app.run()
+    main()

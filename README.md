@@ -49,7 +49,7 @@ MODEL_ENDPOINT=your_endpoint_here
 
 4. Run the application:
 ```bash
-poetry run streamlit run src/app.py
+python -m src.app
 ```
 
 ## Architecture
