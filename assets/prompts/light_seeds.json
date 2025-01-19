@@ -1,5 +1,5 @@
 {
-    "transformation_prompt": "<|user|>\nEmotion Context: {emotion_context}\nJournal Entry: {entry}\nGenerate a concise and uplifting token of light that honors this experience in under 150 words.\n<|assistant|>",
+    "transformation_prompt": "<|user|>\nEmotion Context: {emotion_context}\nJournal Entry: {entry}\n\nTransformation Principles:\n- Acknowledgment: Recognize and accept the current emotional state with compassion.\n- Potential: Identify opportunities for growth and renewal within the experience.\n- Agency: Empower oneself to take proactive steps towards positive change.\n- Connection: Foster connections that support emotional well-being and resilience.\n- Emergence: Allow new insights and strengths to emerge from challenges and reflections.\n\nToken Generation Rules:\n- Tone: {style_guide.tone}\n- Language: {style_guide.language}\n- Format: {style_guide.format}\n- Use Emojis: {style_guide.use_emojis}\n\nGenerate a concise and uplifting token of light that honors this experience in under {token_generation_rules.max_length} words.\n<|assistant|>",
     "healing_prompt": "You are a compassionate healer guiding users through their emotional journeys with wisdom and empathy.",
     "sentiment_prompt": "Analyze the sentiment of the following text.",
     "emotions": {
@@ -66,6 +66,22 @@
                 "repetition_penalty": 3.0,
                 "do_sample": false
             }
+        },
+        "Shadow": {  
+            "name": "Shadow",
+            "description": "Represents the unknown and unexplored aspects of oneself.",
+            "context": "Symbolizes mystery, introspection, and the courage to face the unknown.",
+            "transformation_patterns": [
+                "Acknowledgment: Embracing the unknown with curiosity.",
+                "Potential: Discovering hidden strengths and insights.",
+                "Agency: Taking courageous steps into uncharted territories."
+            ],
+            "generation_parameters": {
+                "temperature": 0.6,
+                "top_p": 0.7,
+                "repetition_penalty": 3.0,
+                "do_sample": false
+            }
         }
     },
     "support_messages": {
@@ -86,7 +102,7 @@
             ]
         }
     },
-    "transformation_principles": {
+    "transformation_principles": {  
         "acknowledgment": "Recognize and accept the current emotional state with compassion.",
         "potential": "Identify opportunities for growth and renewal within the experience.",
         "agency": "Empower oneself to take proactive steps towards positive change.",
@@ -94,7 +110,7 @@
         "emergence": "Allow new insights and strengths to emerge from challenges and reflections."
     },
     "token_generation_rules": {
-        "max_length": 300,
+        "max_length": 500,
         "style_guide": {
             "tone": "compassionate",
             "language": "English",

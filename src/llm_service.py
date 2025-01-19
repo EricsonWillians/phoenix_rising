@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import aiohttp
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, validator
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -118,43 +118,27 @@ class ModelConfig(BaseModel):
     timeout: int = 60
     max_retries: int = 5
 
-    @validator("pipeline")
+    @field_validator("pipeline")
     def validate_pipeline(cls, v):
         allowed_pipelines = {"text-generation", "zero-shot-classification"}
         if v not in allowed_pipelines:
             raise ValueError(f"Pipeline must be one of {allowed_pipelines}")
         return v
 
-
 class EmotionState(BaseModel):
-    """Enhanced emotion state schema with validation."""
-
     name: str
     description: str
     context: str
-    transformation_patterns: list[str]
+    transformation_patterns: list
     generation_parameters: Dict[str, Any]
-    min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
-
-    @validator("transformation_patterns")
-    def validate_patterns(cls, v):
-        if not v:
-            raise ValueError("Must provide at least one transformation pattern")
-        return v
-
 
 class SupportMessage(BaseModel):
-    """Enhanced support message schema."""
+    threshold: float
+    messages: list
 
-    threshold: float = Field(..., ge=-1.0, le=1.0)
-    messages: list[str]
-    context: Optional[str] = None
-
-    @validator("messages")
-    def validate_messages(cls, v):
-        if not v:
-            raise ValueError("Must provide at least one support message")
-        return v
+class TokenGenerationRules(BaseModel):
+    max_length: int
+    style_guide: Dict[str, Any]
 
 
 class StyleGuide(BaseModel):
@@ -176,6 +160,18 @@ class TokenGenerationRules(BaseModel):
     require_emoji: bool = True
     temperature_range: Tuple[float, float] = Field(default=(0.6, 0.9))
 
+class TransformationPrinciples(BaseModel):
+    acknowledgment: str
+    potential: str
+    agency: str
+    connection: str
+    emergence: str
+
+    @field_validator('*', mode='before')
+    def check_not_empty(cls, v, info):
+        if not v:
+            raise ValueError(f"{info.field.name.capitalize()} cannot be empty")
+        return v
 
 class PromptsConfig(BaseModel):
     """Enhanced prompts configuration."""
@@ -183,14 +179,23 @@ class PromptsConfig(BaseModel):
     transformation_prompt: str
     healing_prompt: str
     sentiment_prompt: str
-    emotions: Dict[str, EmotionState]
-    support_messages: Dict[str, SupportMessage]
-    token_generation_rules: TokenGenerationRules
+    emotions: Dict[str, 'EmotionState']  # Forward reference if EmotionState is defined later
+    support_messages: Dict[str, 'SupportMessage']
+    transformation_principles: TransformationPrinciples  # Added this line
+    token_generation_rules: 'TokenGenerationRules'
 
-    @validator("emotions")
+    @field_validator("emotions")
     def validate_emotions(cls, v):
         if not v:
             raise ValueError("Must provide at least one emotion state")
+        return v
+
+    @field_validator("transformation_principles")
+    def validate_transformation_principles(cls, v):
+        required_keys = {"acknowledgment", "potential", "agency", "connection", "emergence"}
+        if not required_keys.issubset(v.dict().keys()):
+            missing = required_keys - set(v.dict().keys())
+            raise ValueError(f"Missing transformation principles: {missing}")
         return v
 
 
@@ -239,7 +244,7 @@ class LightBearer:
         self._initialize_models()
         self._load_configuration(config_path)
         self._setup_caching(cache_dir)
-        
+
         self.service_status = ServiceStatus()  # Initialize service status
         self.session: Optional[aiohttp.ClientSession] = None
         self.last_sentiment_score: Optional[float] = None
@@ -382,55 +387,54 @@ class LightBearer:
         return template.format(text=text)
 
     def _construct_generation_prompt(
-            self, entry: str, emotion: str, sentiment: SentimentResponse
-        ) -> str:
-            """
-            Construct an enhanced prompt for token generation with proper markers.
+        self, entry: str, emotion: str, sentiment: SentimentResponse
+    ) -> str:
+        """
+        Construct an enhanced prompt for token generation with proper markers and detailed instructions.
 
-            Args:
-                entry: Journal entry text
-                emotion: Selected emotion state
-                sentiment: Sentiment analysis results
+        Args:
+            entry: Journal entry text
+            emotion: Selected emotion state
+            sentiment: Sentiment analysis results
 
-            Returns:
-                str: Constructed prompt with markers
-            """
+        Returns:
+            str: Constructed prompt with markers and detailed instructions
+        """
+        try:
             emotion_state = self.prompts.emotions[emotion]
-            transformation_focus = self._determine_transformation_focus(sentiment)
-
-            template = """
-        <|user|>
-        Emotion Context: {emotion_context}
-        Journal Entry: {journal_entry}
-        <|end|>
-        <|assistant|>
-        Task: Generate a transformative message that:
-        1. Acknowledges their current emotional experience with empathy
-        2. Identifies potential for growth or healing
-        3. Offers gentle guidance or perspective
-        4. Uses relevant metaphors or imagery
-        5. Maintains a hopeful, supportive tone
-
-        Requirements:
-        - Be genuine and specific to their situation
-        - Avoid generic platitudes
-        - Include one meaningful metaphor
-        - Keep response under {max_length} words
-        - Include one appropriate ✨ emoji
-
-        Focus particularly on: {focus}
-        """.strip()
-
-            emotion_context = emotion_state.context
-
-            prompt = template.format(
-                emotion_context=emotion_context,
-                journal_entry=entry,
-                max_length=self.prompts.token_generation_rules.max_length,
-                focus=transformation_focus,
+            # Serialize the TransformationPrinciples model to a dictionary
+            transformation_principles_dict = self.prompts.transformation_principles.model_dump()
+            # Construct the transformation principles string
+            transformation_principles = "\n".join(
+                [f"- {key.capitalize()}: {value}" for key, value in transformation_principles_dict.items()]
             )
+            style_guide = self.prompts.token_generation_rules.style_guide
+
+            prompt = f"""
+    <|user|>
+    Emotion Context: {emotion_state.context}
+    Journal Entry: {entry}
+
+    Transformation Principles:
+    {transformation_principles}
+
+    Token Generation Rules:
+    - Tone: {style_guide.tone}
+    - Language: {style_guide.language}
+    - Format: {style_guide.format}
+    - Use Emojis: {style_guide.use_emojis}
+
+    Generate a concise and uplifting token of light that honors this experience in under {self.prompts.token_generation_rules.max_length} words.
+    <|assistant|>
+    """.strip()
 
             return prompt
+        except AttributeError as e:
+            logger.error(f"AttributeError in _construct_generation_prompt: {str(e)}", exc_info=True)
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in _construct_generation_prompt: {str(e)}", exc_info=True)
+            raise
 
     def _determine_transformation_focus(self, sentiment: SentimentResponse) -> str:
         """
@@ -789,9 +793,10 @@ class LightBearer:
             validated_data = self._validate_and_transform_input(entry, emotion)
 
             # Analyze sentiment with fallback
-            sentiment, using_sentiment_fallback = (
-                await self._analyze_sentiment_with_fallback(validated_data["entry"])
-            )
+            (
+                sentiment,
+                using_sentiment_fallback,
+            ) = await self._analyze_sentiment_with_fallback(validated_data["entry"])
 
             # Get support message if needed
             support_message = None
@@ -800,15 +805,16 @@ class LightBearer:
 
             # Generate token with fallback if sentiment was successful
             if not using_sentiment_fallback:
-                token, using_generation_fallback = (
-                    await self._generate_token_with_fallback(
-                        self._construct_generation_prompt(
-                            entry=validated_data["entry"],
-                            emotion=validated_data["emotion"],
-                            sentiment=sentiment,
-                        ),
-                        emotion,
-                    )
+                (
+                    token,
+                    using_generation_fallback,
+                ) = await self._generate_token_with_fallback(
+                    self._construct_generation_prompt(
+                        entry=validated_data["entry"],
+                        emotion=validated_data["emotion"],
+                        sentiment=sentiment,
+                    ),
+                    emotion,
                 )
             else:
                 token = self._get_emotion_specific_fallback(emotion)

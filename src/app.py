@@ -449,14 +449,14 @@ class PhoenixRisingUI:
                         if support:
                             st.info(support)
                         
-                        # Store in the database with fallback status
+                        # Store in the database with fallback status and sentiment score
                         try:
                             journal_entry = await database.add_journal_entry(
                                 content=content,
                                 token=token,
                                 emotion=st.session_state.app_state['current_emotion'],
                                 using_fallback=using_fallback,
-                                sentiment_score=None  # Update as needed
+                                sentiment_score=light_bearer.last_sentiment_score  # Updated line
                             )
                             
                             logger.info(f"Journal entry added with ID: {journal_entry.id}")
