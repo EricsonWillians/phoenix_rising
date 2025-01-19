@@ -1,30 +1,30 @@
 """
 Phoenix Rising Database Layer.
 
-This module handles data persistence for the spiritual journey of users,
-storing their experiences, emotions, and received light tokens. It uses
-SQLAlchemy for robust database operations and includes migration support.
+This module manages data persistence for the spiritual journey of users,
+handling database connections and operations using SQLAlchemy and Pydantic schemas.
 """
 
-from datetime import datetime
-from typing import List, Optional, AsyncGenerator
-import logging
-from pathlib import Path
+from typing import List, Optional, AsyncGenerator, Dict, Any
 
-from sqlalchemy import create_engine, select, desc
+import logging
+
+from sqlalchemy import select, desc, func
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
+
 from sqlalchemy.ext.asyncio import (
-    create_async_engine,
     AsyncSession,
+    create_async_engine,
     async_sessionmaker
 )
-from sqlalchemy.orm import (
-    DeclarativeBase,
-    Mapped,
-    mapped_column,
-    relationship
-)
-from sqlalchemy.sql import func
-from pydantic import BaseModel
+
+from src.models import Base, JournalEntry  # Importing from models.py
+from src.schemas import (
+    JournalEntryCreate,
+    JournalEntryResponse
+)  # Importing Pydantic models from schemas.py
+
+from src.enums import EmotionState  # Importing EmotionState from enums.py
 
 # Configure logging
 logging.basicConfig(
@@ -33,94 +33,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class Base(DeclarativeBase):
-    """Base class for SQLAlchemy models."""
-    pass
 
-class JournalEntry(Base):
-    """
-    Model for storing spiritual journey entries.
-    
-    This model captures the essence of each moment in the user's journey,
-    including their raw emotions and the light tokens received in response.
-    """
-    __tablename__ = "journal_entries"
+class DatabaseError(Exception):
+    """Base exception for database operations."""
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    content: Mapped[str] = mapped_column(nullable=False)
-    emotion: Mapped[str] = mapped_column(nullable=False)
-    light_token: Mapped[str] = mapped_column(nullable=False)
-    sentiment_score: Mapped[float] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(),
-        nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False
-    )
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.details = details or {}
 
-    # Relationships for emotional progression tracking
-    emotional_insights: Mapped[List["EmotionalInsight"]] = relationship(
-        back_populates="journal_entry",
-        cascade="all, delete-orphan"
-    )
 
-class EmotionalInsight(Base):
-    """
-    Model for tracking emotional progression and insights.
-    
-    This helps users see patterns in their emotional journey and
-    track their growth over time.
-    """
-    __tablename__ = "emotional_insights"
+class SQLAlchemyDBError(DatabaseError):
+    """Exception for SQLAlchemy database errors."""
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    journal_entry_id: Mapped[int] = mapped_column(
-        "journal_entry_id", 
-        nullable=False
-    )
-    insight_type: Mapped[str] = mapped_column(nullable=False)
-    value: Mapped[float] = mapped_column(nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(),
-        nullable=False
-    )
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(message, details)
 
-    journal_entry: Mapped[JournalEntry] = relationship(
-        back_populates="emotional_insights"
-    )
-
-# Pydantic models for API interaction
-class JournalEntryCreate(BaseModel):
-    """Schema for creating a new journal entry."""
-    content: str
-    emotion: str
-    light_token: str
-    sentiment_score: Optional[float] = None
-
-class JournalEntryResponse(BaseModel):
-    """Schema for journal entry responses."""
-    id: int
-    content: str
-    emotion: str
-    light_token: str
-    sentiment_score: Optional[float]
-    created_at: datetime
-    
-    class Config:
-        """Pydantic configuration."""
-        from_attributes = True
 
 class DatabaseManager:
     """
     Manages database connections and operations.
-    
+
     This class handles the lifecycle of database connections and provides
     an interface for database operations while ensuring proper resource
     management.
     """
+
+    _instance = None  # Class variable for Singleton instance
+
+    def __new__(cls, *args, **kwargs):
+        """Implement Singleton pattern."""
+        if cls._instance is None:
+            cls._instance = super(DatabaseManager, cls).__new__(cls)
+        return cls._instance
 
     def __init__(
         self,
@@ -129,138 +73,301 @@ class DatabaseManager:
     ) -> None:
         """
         Initialize the database manager.
-        
+
         Args:
             database_url: Optional database URL
             echo: Whether to echo SQL statements
         """
+        if hasattr(self, 'initialized') and self.initialized:
+            return  # Avoid re-initialization
+
         self.database_url = (
-            database_url or 
+            database_url or
             "sqlite+aiosqlite:///./phoenix.db"
         )
         self.engine = create_async_engine(
             self.database_url,
             echo=echo,
-            pool_pre_ping=True
+            pool_pre_ping=True,
+            future=True
         )
         self.async_session = async_sessionmaker(
             self.engine,
-            expire_on_commit=False
+            expire_on_commit=False,
+            class_=AsyncSession
         )
+        logger.info("DatabaseManager initialized with URL: %s", self.database_url)
+        self.initialized = True  # Flag to prevent re-initialization
 
-    async def create_tables(self) -> None:
-        """Create all database tables."""
-        async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+    async def initialize_database(self) -> None:
+        """
+        Initialize the database by creating all tables.
+
+        This should be called at the application startup.
+        """
+        try:
+            async with self.engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database tables created successfully.")
+        except SQLAlchemyError as e:
+            logger.error("Error creating database tables: %s", e)
+            raise SQLAlchemyDBError("Failed to create database tables.", {"error": str(e)})
 
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """
         Get a database session.
-        
+
         Yields:
             AsyncSession for database operations
         """
         async with self.async_session() as session:
             try:
                 yield session
-            except Exception as e:
+            except SQLAlchemyError as e:
                 await session.rollback()
-                logger.error(f"Database session error: {e}")
-                raise
+                logger.error("Database session error: %s", e)
+                raise SQLAlchemyDBError("Database session failed.", {"error": str(e)})
             finally:
                 await session.close()
 
     async def create_journal_entry(
         self,
-        entry: JournalEntryCreate,
-        session: AsyncSession
-    ) -> JournalEntry:
+        entry: JournalEntryCreate
+    ) -> JournalEntryResponse:
         """
         Create a new journal entry.
-        
+
         Args:
             entry: Entry data
-            session: Database session
-            
+
         Returns:
-            Created JournalEntry
+            JournalEntryResponse containing the created entry details
         """
-        db_entry = JournalEntry(
-            content=entry.content,
-            emotion=entry.emotion,
-            light_token=entry.light_token,
-            sentiment_score=entry.sentiment_score
-        )
-        session.add(db_entry)
-        await session.commit()
-        await session.refresh(db_entry)
-        return db_entry
+        try:
+            async with self.async_session() as session:
+                db_entry = JournalEntry(
+                    content=entry.content,
+                    emotion=entry.emotion,
+                    light_token=entry.light_token or "",  # Handle Optional
+                    sentiment_score=entry.sentiment_score
+                )
+                session.add(db_entry)
+                await session.commit()
+                await session.refresh(db_entry)
+                logger.info("Journal entry created with ID: %s", db_entry.id)
+                return JournalEntryResponse.from_orm(db_entry)
+        except OperationalError as oe:
+            logger.warning("OperationalError encountered: %s. Attempting to reinitialize the database.", oe)
+            await self.initialize_database()  # Attempt to recreate tables
+            # Retry the operation once after reinitialization
+            try:
+                async with self.async_session() as session:
+                    db_entry = JournalEntry(
+                        content=entry.content,
+                        emotion=entry.emotion,
+                        light_token=entry.light_token or "",  # Handle Optional
+                        sentiment_score=entry.sentiment_score
+                    )
+                    session.add(db_entry)
+                    await session.commit()
+                    await session.refresh(db_entry)
+                    logger.info("Journal entry created with ID: %s", db_entry.id)
+                    return JournalEntryResponse.from_orm(db_entry)
+            except SQLAlchemyError as e:
+                logger.error("Database error after reinitialization: %s", e)
+                raise SQLAlchemyDBError("Failed to create journal entry after reinitialization.", {"error": str(e)})
+        except SQLAlchemyError as e:
+            logger.error("Database error while creating journal entry: %s", e)
+            raise SQLAlchemyDBError("Failed to create journal entry.", {"error": str(e)})
 
     async def get_recent_entries(
         self,
-        session: AsyncSession,
         limit: int = 10
-    ) -> List[JournalEntry]:
+    ) -> List[JournalEntryResponse]:
         """
         Get recent journal entries.
-        
+
         Args:
-            session: Database session
             limit: Maximum number of entries to return
-            
+
         Returns:
-            List of recent JournalEntry objects
+            List of JournalEntryResponse objects
         """
-        query = select(JournalEntry).order_by(
-            desc(JournalEntry.created_at)
-        ).limit(limit)
-        result = await session.execute(query)
-        return list(result.scalars().all())
+        try:
+            async with self.async_session() as session:
+                query = select(JournalEntry).order_by(
+                    desc(JournalEntry.created_at)
+                ).limit(limit)
+                result = await session.execute(query)
+                entries = result.scalars().all()
+                logger.info("Retrieved %d recent journal entries.", len(entries))
+                return [JournalEntryResponse.from_orm(entry) for entry in entries]
+        except OperationalError as oe:
+            logger.warning("OperationalError encountered while fetching recent entries: %s. Attempting to reinitialize the database.", oe)
+            await self.initialize_database()  # Attempt to recreate tables
+            # Retry the operation once after reinitialization
+            try:
+                async with self.async_session() as session:
+                    query = select(JournalEntry).order_by(
+                        desc(JournalEntry.created_at)
+                    ).limit(limit)
+                    result = await session.execute(query)
+                    entries = result.scalars().all()
+                    logger.info("Retrieved %d recent journal entries after reinitialization.", len(entries))
+                    return [JournalEntryResponse.from_orm(entry) for entry in entries]
+            except SQLAlchemyError as e:
+                logger.error("Database error after reinitialization while fetching recent entries: %s", e)
+                raise SQLAlchemyDBError("Failed to fetch recent journal entries after reinitialization.", {"error": str(e)})
+        except SQLAlchemyError as e:
+            logger.error("Database error while fetching recent entries: %s", e)
+            raise SQLAlchemyDBError("Failed to fetch recent journal entries.", {"error": str(e)})
+
+    async def add_journal_entry(
+        self,
+        content: str,
+        token: str,
+        emotion: EmotionState,
+        using_fallback: bool = False,
+        sentiment_score: Optional[float] = None
+    ) -> JournalEntryResponse:
+        """
+        Add a new journal entry to the database.
+
+        Args:
+            content: The content of the journal entry
+            token: The light token associated with the entry
+            emotion: The emotion associated with the entry
+            using_fallback: Indicates if a fallback was used
+            sentiment_score: Sentiment analysis score
+
+        Returns:
+            JournalEntryResponse containing the created entry details
+        """
+        entry = JournalEntryCreate(
+            content=content,
+            emotion=emotion,
+            light_token=token,
+            sentiment_score=sentiment_score
+        )
+        try:
+            async with self.async_session() as session:
+                db_entry = JournalEntry(
+                    content=entry.content,
+                    emotion=entry.emotion,
+                    light_token=entry.light_token or "",  # Handle Optional
+                    sentiment_score=entry.sentiment_score,
+                    using_fallback=using_fallback
+                )
+                session.add(db_entry)
+                await session.commit()
+                await session.refresh(db_entry)
+                logger.info("Journal entry added with ID: %s", db_entry.id)
+                return JournalEntryResponse.from_orm(db_entry)
+        except OperationalError as oe:
+            logger.warning("OperationalError encountered while adding journal entry: %s. Attempting to reinitialize the database.", oe)
+            await self.initialize_database()  # Attempt to recreate tables
+            # Retry the operation once after reinitialization
+            try:
+                async with self.async_session() as session:
+                    db_entry = JournalEntry(
+                        content=entry.content,
+                        emotion=entry.emotion,
+                        light_token=entry.light_token or "",  # Handle Optional
+                        sentiment_score=entry.sentiment_score,
+                        using_fallback=using_fallback
+                    )
+                    session.add(db_entry)
+                    await session.commit()
+                    await session.refresh(db_entry)
+                    logger.info("Journal entry added with ID: %s after reinitialization.", db_entry.id)
+                    return JournalEntryResponse.from_orm(db_entry)
+            except SQLAlchemyError as e:
+                logger.error("Database error after reinitialization while adding journal entry: %s", e)
+                raise SQLAlchemyDBError("Failed to add journal entry after reinitialization.", {"error": str(e)})
+        except SQLAlchemyError as e:
+            logger.error("Database error while adding journal entry: %s", e)
+            raise SQLAlchemyDBError("Failed to add journal entry.", {"error": str(e)})
 
     async def get_emotional_progression(
         self,
-        session: AsyncSession,
         days: int = 30
-    ) -> List[dict]:
+    ) -> List[Dict[str, Any]]:
         """
         Get emotional progression over time.
-        
+
         Args:
-            session: Database session
             days: Number of days to analyze
-            
+
         Returns:
             List of emotional progression data points
         """
-        query = select(
-            JournalEntry.created_at,
-            JournalEntry.emotion,
-            JournalEntry.sentiment_score
-        ).where(
-            JournalEntry.created_at >= func.date('now', f'-{days} days')
-        ).order_by(JournalEntry.created_at)
-        
-        result = await session.execute(query)
-        return [
-            {
-                "date": row.created_at,
-                "emotion": row.emotion,
-                "sentiment": row.sentiment_score
-            }
-            for row in result.all()
-        ]
+        try:
+            async with self.async_session() as session:
+                query = select(
+                    JournalEntry.created_at,
+                    JournalEntry.emotion,
+                    JournalEntry.sentiment_score
+                ).where(
+                    JournalEntry.created_at >= func.datetime('now', f'-{days} days')
+                ).order_by(JournalEntry.created_at)
+
+                result = await session.execute(query)
+                progression = [
+                    {
+                        "date": row.created_at,
+                        "emotion": row.emotion.value,  # Access enum value
+                        "sentiment": row.sentiment_score
+                    }
+                    for row in result.all()
+                ]
+                logger.info("Retrieved emotional progression for the last %d days.", days)
+                return progression
+        except OperationalError as oe:
+            logger.warning("OperationalError encountered while fetching emotional progression: %s. Attempting to reinitialize the database.", oe)
+            await self.initialize_database()  # Attempt to recreate tables
+            # Retry the operation once after reinitialization
+            try:
+                async with self.async_session() as session:
+                    query = select(
+                        JournalEntry.created_at,
+                        JournalEntry.emotion,
+                        JournalEntry.sentiment_score
+                    ).where(
+                        JournalEntry.created_at >= func.datetime('now', f'-{days} days')
+                    ).order_by(JournalEntry.created_at)
+
+                    result = await session.execute(query)
+                    progression = [
+                        {
+                            "date": row.created_at,
+                            "emotion": row.emotion.value,  # Access enum value
+                            "sentiment": row.sentiment_score
+                        }
+                        for row in result.all()
+                    ]
+                    logger.info("Retrieved emotional progression for the last %d days after reinitialization.", days)
+                    return progression
+            except SQLAlchemyError as e:
+                logger.error("Database error after reinitialization while fetching emotional progression: %s", e)
+                raise SQLAlchemyDBError("Failed to fetch emotional progression after reinitialization.", {"error": str(e)})
+        except SQLAlchemyError as e:
+            logger.error("Database error while fetching emotional progression: %s", e)
+            raise SQLAlchemyDBError("Failed to fetch emotional progression.", {"error": str(e)})
 
     async def close(self) -> None:
         """Close database connections."""
         await self.engine.dispose()
+        logger.info("Database connections closed.")
 
-# Database instance for application use
+
+# Initialize the Singleton DatabaseManager instance
 database = DatabaseManager()
 
+# Dependency for FastAPI/Streamlit to get database sessions
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    Dependency for FastAPI/Streamlit to get database sessions.
-    
+    Dependency to provide a database session.
+
     Yields:
         AsyncSession for database operations
     """

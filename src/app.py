@@ -9,17 +9,13 @@ import sys
 from pathlib import Path
 import asyncio
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, List, Dict, Any
 import logging
 from logging.handlers import RotatingFileHandler
-import traceback
-from functools import wraps
 
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-from sqlalchemy.ext.asyncio import AsyncSession
-import extra_streamlit_components as stx
 
 # Add project root to Python path
 project_root = Path(__file__).resolve().parent.parent
@@ -31,7 +27,7 @@ from src.llm_service import (
     APIConnectionError,
     APIEndpointUnavailableError
 )
-from src.database import DatabaseManager, get_db
+from src.database import database, get_db  # Import the Singleton instance
 from src.schemas import (
     EmotionState,
     JournalEntryCreate,
@@ -42,7 +38,7 @@ from src.utils import Journey, DataProcessor, ApplicationConfig
 
 # Configure logging
 logger = logging.getLogger(__name__)
-handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=3)
+handler = RotatingFileHandler('app.log', maxBytes=100000, backupCount=5)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
@@ -300,7 +296,6 @@ class PhoenixRisingUI:
         self.setup_page_config()
         inject_custom_css()
         self.init_session_state()
-        self.db_manager = DatabaseManager()
         self.config = ApplicationConfig()
     
     def setup_page_config(self) -> None:
@@ -409,26 +404,37 @@ class PhoenixRisingUI:
                     use_container_width=True
                 )
                 
-                if submitted and content:
-                    asyncio.run(self.handle_submission(content))
+                if submitted and content.strip():
+                    asyncio.run(self.handle_submission(content.strip()))
+                elif submitted and not content.strip():
+                    st.error("Journal entry cannot be empty. Please share your truth.")
     
     async def handle_submission(self, content: str) -> None:
         """Handle journal entry submission with graceful error handling."""
         try:
             with st.spinner("🕯️ Transmuting experience into light..."):
                 async with LightBearer() as light_bearer:
-                    token, support = await light_bearer.generate_light_token(
+                    # Generate light token using llm_service
+                    token, support, using_fallback = await light_bearer.generate_light_token(
                         entry=content,
                         emotion=st.session_state.app_state['current_emotion']
                     )
+                    
+                    # Log the token received
+                    logger.info(f"Generated Light Token: {token}")
                     
                     if token:
                         # Store the token in session state
                         st.session_state.app_state['light_tokens'].append(token)
                         
-                        # Optionally, store in the database
-                        # await self.db_manager.add_journal_entry(content, token, st.session_state.app_state['current_emotion'])
+                        # Display a notice if using fallback responses
+                        if using_fallback:
+                            st.info(
+                                "💫 Our sanctuary is providing alternative guidance while "
+                                "maintaining the sacred space of your journey."
+                            )
                         
+                        # Display the generated token
                         st.markdown(
                             f"""
                             <div class="light-token">
@@ -439,11 +445,35 @@ class PhoenixRisingUI:
                             unsafe_allow_html=True
                         )
                         
+                        # Display support message if available
                         if support:
                             st.info(support)
+                        
+                        # Store in the database with fallback status
+                        try:
+                            journal_entry = await database.add_journal_entry(
+                                content=content,
+                                token=token,
+                                emotion=st.session_state.app_state['current_emotion'],
+                                using_fallback=using_fallback,
+                                sentiment_score=None  # Update as needed
+                            )
+                            
+                            logger.info(f"Journal entry added with ID: {journal_entry.id}")
+                            
+                            # Optionally, fetch and update journey data for analytics
+                            await self.update_journey_data()
+                            
+                            st.success("Your journal entry has been transformed successfully!")
+                            
+                        except Exception as e:
+                            logger.error(f"Database error: {str(e)}")
+                            st.error("An error occurred while saving your journal entry. Please try again.")
+                            # Continue without database storage
                             
         except APIEndpointUnavailableError:
             self.render_service_unavailable_message()
+            logger.warning("Service endpoints unavailable")
             
         except APIConnectionError as e:
             st.error(
@@ -458,6 +488,18 @@ class PhoenixRisingUI:
                 "We are working to restore harmony."
             )
             logger.error(f"Unexpected Error: {str(e)}")
+    
+    async def update_journey_data(self) -> None:
+        """Fetch the latest journey data for analytics."""
+        try:
+            # Define the number of days for emotional progression
+            days = 30
+            progression = await database.get_emotional_progression(days=days)
+            st.session_state.app_state['journey_data'] = progression
+            logger.info("Journey data updated for analytics.")
+        except Exception as e:
+            logger.error(f"Error fetching journey data: {str(e)}")
+            st.error("An error occurred while fetching your journey data.")
     
     def render_analytics(self) -> None:
         """Render analytics section."""
@@ -477,31 +519,29 @@ class PhoenixRisingUI:
                     return
                 
                 # Example Analytics: Sentiment Over Time
-                # Assuming journey_data contains tuples of (timestamp, sentiment_score)
-                # Replace this with actual data from your database or state
-                journey_data = st.session_state.journey_data
+                journey_data = st.session_state.app_state['journey_data']
                 if journey_data:
                     # Convert journey_data to a DataFrame
                     import pandas as pd
-                    df = pd.DataFrame(journey_data, columns=['timestamp', 'sentiment_score'])
-                    df['timestamp'] = pd.to_datetime(df['timestamp'])
+                    df = pd.DataFrame(journey_data, columns=['date', 'sentiment'])
+                    df['date'] = pd.to_datetime(df['date'])
                     
                     # Line chart for sentiment over time
                     fig = px.line(
                         df, 
-                        x='timestamp', 
-                        y='sentiment_score', 
+                        x='date', 
+                        y='sentiment', 
                         title='Sentiment Over Time',
                         labels={
-                            'timestamp': 'Date',
-                            'sentiment_score': 'Sentiment Score'
+                            'date': 'Date',
+                            'sentiment': 'Sentiment Score'
                         },
                         template='plotly_dark'
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
                     # Emotion distribution
-                    emotion_counts = df['sentiment_score'].apply(self.map_sentiment_to_emotion).value_counts().reset_index()
+                    emotion_counts = df['sentiment'].apply(self.map_sentiment_to_emotion).value_counts().reset_index()
                     emotion_counts.columns = ['Emotion', 'Count']
                     
                     fig2 = px.pie(
@@ -560,9 +600,51 @@ class PhoenixRisingUI:
                         unsafe_allow_html=True
                     )
     
+    def render_recent_entries(self) -> None:
+        """Render recent journal entries."""
+        with st.container():
+            st.markdown(
+                """
+                <div class="content-card">
+                    <h3>🗒️ Recent Journal Entries</h3>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+            # Fetch recent entries from the database
+            try:
+                recent_entries = asyncio.run(database.get_recent_entries(limit=5))
+                if recent_entries:
+                    for entry in recent_entries:
+                        st.markdown(
+                            f"""
+                            <div class="content-card">
+                                <h4>{entry.emotion.value} - {entry.created_at.strftime('%Y-%m-%d %H:%M')}</h4>
+                                <p>{entry.content}</p>
+                                <p><strong>Light Token:</strong> {entry.light_token}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.info("No journal entries found. Start by sharing your truth!")
+            except Exception as e:
+                logger.error(f"Error fetching recent entries: {str(e)}")
+                st.error("An error occurred while fetching recent journal entries.")
+    
     def render(self) -> None:
         """Render the complete interface."""
         self.render_header()
+        
+        # Initialize the database before rendering UI
+        try:
+            asyncio.run(database.initialize_database())
+            logger.info("Database initialized successfully.")
+        except Exception as e:
+            st.error(f"Database initialization failed: {e}")
+            logger.error(f"Database initialization failed: {e}")
+            st.stop()  # Stop further execution if initialization fails
         
         # Main content
         col1, col2 = st.columns([2, 1])
@@ -570,6 +652,7 @@ class PhoenixRisingUI:
         with col1:
             self.render_emotion_selector()
             self.render_journal_section()
+            self.render_recent_entries()
             
         with col2:
             self.render_analytics()
@@ -582,4 +665,12 @@ def main() -> None:
     ui.render()
 
 if __name__ == "__main__":
+    # Register shutdown handler to close database connections gracefully
+    import atexit
+
+    @atexit.register
+    def shutdown():
+        """Ensure that the database connections are closed on shutdown."""
+        asyncio.run(database.close())
+    
     main()

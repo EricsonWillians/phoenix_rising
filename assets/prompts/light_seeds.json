@@ -94,7 +94,7 @@
         "emergence": "Allow new insights and strengths to emerge from challenges and reflections."
     },
     "token_generation_rules": {
-        "max_length": 150,
+        "max_length": 300,
         "style_guide": {
             "tone": "compassionate",
             "language": "English",

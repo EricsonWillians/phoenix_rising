@@ -9,27 +9,9 @@ all components while preserving the spiritual essence of the sanctuary.
 from datetime import datetime
 from typing import Optional, List, Dict
 from pydantic import BaseModel, Field, validator, ConfigDict
-from enum import Enum
 
-class EmotionState(str, Enum):
-    """Enumeration of possible emotional states in the spiritual journey."""
-    EMBER = "Ember"
-    SHADOW = "Shadow"
-    STORM = "Storm"
-    DAWN = "Dawn"
-    STARLIGHT = "Starlight"
+from src.enums import EmotionState  # Importing from enums.py
 
-    @classmethod
-    def get_description(cls, emotion: "EmotionState") -> str:
-        """Provide spiritual context for each emotional state."""
-        descriptions = {
-            cls.EMBER: "The last warmth of a dying fire, holding potential for rebirth",
-            cls.SHADOW: "The depth where hidden strengths germinate",
-            cls.STORM: "Chaos that precedes transformation",
-            cls.DAWN: "First light breaking through darkness",
-            cls.STARLIGHT: "Eternal guidance in the void"
-        }
-        return descriptions.get(emotion, "Unknown emotional state")
 
 class SentimentAnalysis(BaseModel):
     """Schema for sentiment analysis results."""
@@ -47,11 +29,12 @@ class SentimentAnalysis(BaseModel):
         ...,
         description="Flag indicating if supportive intervention is recommended"
     )
-    
+
     model_config = ConfigDict(
         title="Sentiment Analysis Result",
         frozen=True
     )
+
 
 class LightToken(BaseModel):
     """Schema for generated light tokens."""
@@ -71,7 +54,7 @@ class LightToken(BaseModel):
         default_factory=datetime.utcnow,
         description="Moment of token generation"
     )
-    
+
     model_config = ConfigDict(
         title="Light Token",
         json_encoders={
@@ -85,6 +68,7 @@ class LightToken(BaseModel):
         if len(v.split()) < 3:
             raise ValueError("Light token must contain at least three words")
         return v.strip()
+
 
 class JournalEntryCreate(BaseModel):
     """Schema for creating new journal entries."""
@@ -108,7 +92,7 @@ class JournalEntryCreate(BaseModel):
         le=1.0,
         description="Analyzed sentiment score"
     )
-    
+
     model_config = ConfigDict(
         title="Journal Entry Creation",
         json_schema_extra={
@@ -129,6 +113,7 @@ class JournalEntryCreate(BaseModel):
             raise ValueError("Journal content cannot be empty")
         return v
 
+
 class JournalEntryResponse(BaseModel):
     """Schema for journal entry responses."""
     id: int = Field(..., description="Unique identifier for the entry")
@@ -141,7 +126,7 @@ class JournalEntryResponse(BaseModel):
     )
     created_at: datetime = Field(..., description="Entry creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
-    
+
     model_config = ConfigDict(
         title="Journal Entry Response",
         from_attributes=True,
@@ -149,6 +134,7 @@ class JournalEntryResponse(BaseModel):
             datetime: lambda v: v.isoformat()
         }
     )
+
 
 class EmotionalProgression(BaseModel):
     """Schema for emotional progression analytics."""
@@ -177,7 +163,7 @@ class EmotionalProgression(BaseModel):
         le=1.0,
         description="Average sentiment over period"
     )
-    
+
     model_config = ConfigDict(
         title="Emotional Progression Analytics",
         frozen=True
@@ -189,6 +175,7 @@ class EmotionalProgression(BaseModel):
         if set(EmotionState) != set(v.keys()):
             raise ValueError("Must include counts for all emotional states")
         return v
+
 
 class UserInsight(BaseModel):
     """Schema for generated user insights."""
@@ -209,7 +196,7 @@ class UserInsight(BaseModel):
         default_factory=datetime.utcnow,
         description="Insight generation timestamp"
     )
-    
+
     model_config = ConfigDict(
         title="User Journey Insight",
         json_encoders={
@@ -226,6 +213,7 @@ class UserInsight(BaseModel):
             )
         return v
 
+
 class ErrorResponse(BaseModel):
     """Schema for error responses."""
     error_code: str = Field(..., description="Error identifier")
@@ -238,7 +226,7 @@ class ErrorResponse(BaseModel):
         default_factory=datetime.utcnow,
         description="Error occurrence timestamp"
     )
-    
+
     model_config = ConfigDict(
         title="Error Response",
         json_encoders={
