@@ -42,8 +42,6 @@ Dive deep into your emotional journey with actionable insights and analytics:
 
 Each element of **Phoenix Rising** is tailored to support your emotional growth while creating an aesthetically pleasing experience. These screenshots highlight the application's ability to combine **cutting-edge AI** with **thoughtful design** for meaningful interactions.
 
-Let me know if you'd like further refinements!
-
 ## Built for the GitHub Copilot 1-Day Build Challenge 🛫
 
 This project was developed for the **GitHub Copilot 1-Day Build Challenge**, which tasked participants with creating a functional, innovative solution in just 24 hours using AI-powered tools.
