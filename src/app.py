@@ -14,6 +14,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -331,127 +332,75 @@ class PhoenixRisingUI:
         )
     
     def render_service_unavailable_message(self) -> None:
-        """Render an enhanced service unavailability message with status and recommendations."""
-        st.markdown(
-            """
-            <div class="maintenance-card">
-                <h3>🌅 Sanctuary Renewal in Progress</h3>
-                <p class="status-message">
-                    Our sacred space is currently in a brief period of restoration. This natural cycle 
-                    helps maintain the sanctuary's strength and resilience.
-                </p>
-                <div class="maintenance-details">
-                    <h4>What's Happening?</h4>
-                    <p>To preserve the quality of our sanctuary and ensure sustainable operation, 
-                    our service occasionally enters a brief rest state. This process typically 
-                    lasts 2-3 minutes.</p>
-                    
-                    <h4>During This Time:</h4>
-                    <ul class="maintenance-list">
-                        <li>Your entry has been safely preserved</li>
-                        <li>A thoughtfully crafted alternative response has been provided</li>
-                        <li>All your previous journal entries remain secure</li>
-                    </ul>
-                    
-                    <h4>Recommended Actions:</h4>
-                    <ul class="maintenance-list">
-                        <li>Take this moment for gentle reflection</li>
-                        <li>Review your previous journal entries and insights</li>
-                        <li>Return in a few minutes to continue your journey</li>
-                    </ul>
-                </div>
-                <div class="maintenance-progress">
-                    <div class="progress-bar"></div>
-                </div>
-            </div>
-            <style>
-            .maintenance-card {
-                background: linear-gradient(
-                    135deg,
-                    rgba(59, 130, 246, 0.1),
-                    rgba(147, 51, 234, 0.1)
-                );
-                border: 1px solid rgba(59, 130, 246, 0.2);
-                border-radius: 15px;
-                padding: 2rem;
-                margin: 1rem 0;
-                color: #e2e8f0;
-            }
-            
-            .maintenance-card h3 {
-                color: #e2e8f0;
-                margin-bottom: 1.5rem;
-                font-size: 1.5rem;
-            }
-            
-            .maintenance-card h4 {
-                color: #94a3b8;
-                margin: 1.5rem 0 0.5rem 0;
-                font-size: 1.1rem;
-            }
-            
-            .status-message {
-                font-size: 1.1rem;
-                line-height: 1.6;
-                margin-bottom: 1.5rem;
-                color: #94a3b8;
-            }
-            
-            .maintenance-details {
+        """Render an enhanced service unavailability message with proper HTML rendering."""
+        html_content = """
+        <div style="
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 1rem 0;
+            text-align: center;
+            color: #e2e8f0;
+        ">
+            <h3 style="color: #e2e8f0; margin-bottom: 1.5rem; font-size: 1.5rem;">🌅 Sanctuary Renewal in Progress</h3>
+            <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem; color: #94a3b8;">
+                Our sacred space is currently in a brief period of restoration. This natural cycle 
+                helps maintain the sanctuary's strength and resilience.
+            </p>
+            <div style="
                 background: rgba(30, 41, 59, 0.3);
                 border-radius: 10px;
                 padding: 1.5rem;
                 margin: 1rem 0;
-            }
-            
-            .maintenance-list {
-                list-style-type: none;
-                padding-left: 0;
-                margin: 0.5rem 0;
-            }
-            
-            .maintenance-list li {
-                padding: 0.5rem 0;
-                color: #e2e8f0;
-                display: flex;
-                align-items: center;
-            }
-            
-            .maintenance-list li::before {
-                content: "•";
-                color: #3b82f6;
-                font-weight: bold;
-                margin-right: 0.5rem;
-            }
-            
-            .maintenance-progress {
+            ">
+                <h4 style="color: #94a3b8; margin: 1.5rem 0 0.5rem 0; font-size: 1.1rem;">What's Happening?</h4>
+                <p style="font-size: 1rem; color: #94a3b8;">
+                    To preserve the quality of our sanctuary and ensure sustainable operation, 
+                    our service occasionally enters a brief rest state. This process typically lasts 2-3 minutes.
+                </p>
+                
+                <h4 style="color: #94a3b8; margin: 1.5rem 0 0.5rem 0; font-size: 1.1rem;">Steps You Can Take:</h4>
+                <ul style="list-style-type: none; padding-left: 0; margin: 0.5rem 0; color: #e2e8f0;">
+                    <li style="padding: 0.5rem 0; display: flex; align-items: center;">
+                        <strong>💡 Check Your Configuration:</strong> Verify your `.env` file settings and ensure your API tokens are valid.
+                    </li>
+                    <li style="padding: 0.5rem 0; display: flex; align-items: center;">
+                        <strong>🔗 Test Connectivity:</strong> Use tools like `curl` or `Postman` to confirm the endpoints are reachable.
+                    </li>
+                    <li style="padding: 0.5rem 0; display: flex; align-items: center;">
+                        <strong>🌐 Monitor Status:</strong> Visit the <a href="https://huggingface.co/inference-endpoints" target="_blank" style="color: #3b82f6;">Hugging Face dashboard</a> for endpoint health.
+                    </li>
+                    <li style="padding: 0.5rem 0; display: flex; align-items: center;">
+                        <strong>🧘 Pause and Reflect:</strong> Take this moment for a short break or review past entries.
+                    </li>
+                </ul>
+            </div>
+            <div style="
                 width: 100%;
                 height: 4px;
                 background: rgba(59, 130, 246, 0.1);
                 border-radius: 2px;
                 margin-top: 1.5rem;
                 overflow: hidden;
-            }
-            
-            .maintenance-progress .progress-bar {
-                width: 30%;
-                height: 100%;
-                background: linear-gradient(
-                    90deg,
-                    #3b82f6,
-                    #9333ea
-                );
-                animation: progress 2s infinite ease-in-out;
-            }
-            
+            ">
+                <div style="
+                    width: 30%;
+                    height: 100%;
+                    background: linear-gradient(90deg, #3b82f6, #9333ea);
+                    animation: progress 2s infinite ease-in-out;
+                "></div>
+            </div>
+        </div>
+        <style>
             @keyframes progress {
                 0% { transform: translateX(-100%); }
                 100% { transform: translateX(400%); }
             }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
+        </style>
+        """
+        components.html(html_content, height=600)
+
     
     def render_emotion_selector(self) -> None:
         """Render emotion selection interface."""

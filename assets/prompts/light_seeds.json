@@ -5,7 +5,7 @@
     "emotions": {
         "Ember": {
             "name": "Ember",
-            "description": "Represents smoldering intensity and inner fire.",
+            "description": "The last warmth of a dying fire, holding potential for rebirth.",
             "context": "Symbolizes passion, determination, and the burning desire to achieve goals.",
             "transformation_patterns": [
                 "Acknowledgment: Recognizing the inner fire and passion.",
@@ -21,7 +21,7 @@
         },
         "Shadow": {
             "name": "Shadow",
-            "description": "Represents the unknown and unexplored aspects of oneself.",
+            "description": "The depth where hidden strengths germinate.",
             "context": "Symbolizes mystery, introspection, and the courage to face the unknown.",
             "transformation_patterns": [
                 "Acknowledgment: Embracing the unknown with curiosity.",
@@ -37,7 +37,7 @@
         },
         "Storm": {
             "name": "Storm",
-            "description": "Embodies turmoil, change, and the power of transformation.",
+            "description": "Chaos that precedes transformation.",
             "context": "Represents the challenges and upheavals that lead to personal growth.",
             "transformation_patterns": [
                 "Acknowledgment: Accepting the chaos and uncertainty.",
@@ -53,7 +53,7 @@
         },
         "Dawn": {
             "name": "Dawn",
-            "description": "The beginning of a new day.",
+            "description": "First light breaking through darkness.",
             "context": "Symbolizes hope, renewal, and new beginnings.",
             "transformation_patterns": [
                 "Acknowledgment: Recognizing the start of a new journey.",
@@ -67,19 +67,19 @@
                 "do_sample": false
             }
         },
-        "Twilight": {
-            "name": "Twilight",
-            "description": "The period between daylight and darkness.",
-            "context": "Represents reflection, transition, and the balance between light and shadow.",
+        "Starlight": {
+            "name": "Starlight",
+            "description": "Eternal guidance in the void.",
+            "context": "Represents clarity, connection, and finding light in the darkness.",
             "transformation_patterns": [
-                "Acknowledgment: Embracing the balance between light and shadow.",
-                "Potential: Finding peace in transitions and change.",
-                "Agency: Encouraging thoughtful reflection and mindful action."
+                "Acknowledgment: Recognizing the guiding light amidst challenges.",
+                "Potential: Harnessing the clarity of the stars for inner wisdom.",
+                "Agency: Taking inspired steps guided by eternal truths."
             ],
             "generation_parameters": {
-                "temperature": 0.65,
-                "top_p": 0.75,
-                "repetition_penalty": 2.8,
+                "temperature": 0.6,
+                "top_p": 0.7,
+                "repetition_penalty": 3.0,
                 "do_sample": false
             }
         }

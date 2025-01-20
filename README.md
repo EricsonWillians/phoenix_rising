@@ -16,7 +16,33 @@ The term "cutting-edge AI" here refers to the utilization of robust models tailo
 
 These models strike a balance between cost and functionality, allowing the project to remain accessible and functional. However, better responses naturally correlate with higher-quality models. Users can adapt the application by upgrading models, configuring `.env` variables, and ensuring adequate token budgets.
 
---- 
+## 🌟 Screenshots: Experience the Journey
+
+### 1. **Welcome to Your Digital Sanctuary**
+The main interface is designed to provide a serene, intuitive environment where users can:
+
+- **Reflect**: Choose from a range of emotions to set the tone of your journaling session.
+- **Express**: Share your thoughts and transform them into uplifting "light tokens."
+- **Explore**: Gain insights into your emotional progression through interactive visuals.
+
+![Main Interface](./assets/screenshots/0.png)
+
+---
+
+### 2. **Illuminate Your Emotional Journey**
+Dive deep into your emotional journey with actionable insights and analytics:
+
+- **Trends Over Time**: View how your emotions evolve through a detailed graph.
+- **State Distribution**: Explore the balance between emotional states using a clean pie chart.
+- **Personalized Tokens**: Revisit the light tokens generated during your reflections.
+
+![Analytics and Insights](./assets/screenshots/1.png)
+
+---
+
+Each element of **Phoenix Rising** is tailored to support your emotional growth while creating an aesthetically pleasing experience. These screenshots highlight the application's ability to combine **cutting-edge AI** with **thoughtful design** for meaningful interactions.
+
+Let me know if you'd like further refinements!
 
 ## Built for the GitHub Copilot 1-Day Build Challenge 🛫
 
@@ -221,6 +247,140 @@ Due to the time constraints of the challenge, the following improvements are pla
 5. **Documentation**:
    - Extend inline comments and docstrings for improved developer onboarding.
    - Create API documentation for future integration capabilities.
+
+---
+
+## Troubleshooting 🛠️
+
+If you encounter issues while running **Phoenix Rising**, this section provides solutions for common problems related to configuration, models, and endpoint connectivity.
+
+---
+
+### Common Issues and Solutions
+
+#### 1. **Streamlit Stuck on Loading or Progress Bars**
+   **Symptoms**:
+   - The app displays a message like:
+     ```
+     🌅 Sanctuary Renewal in Progress
+     Our sacred space is currently in a brief period of restoration...
+     ```
+   - The application seems to be in a "restoration" state longer than expected.
+
+   **Possible Causes**:
+   - The Hugging Face inference endpoint is scaled to zero and is cold-starting.
+   - Network latency or temporary API unavailability.
+
+   **Solutions**:
+   - Check the endpoint status in your [Hugging Face Dashboard](https://huggingface.co/inference-endpoints).
+   - Ensure that the endpoints are configured to maintain at least one active replica to reduce cold-start delays.
+   - Wait 2-3 minutes for the service to restore and retry.
+
+---
+
+#### 2. **Invalid or Missing API Token**
+   **Symptoms**:
+   - Errors indicating "401 Unauthorized" or "Token Invalid."
+   - Models fail to respond, and the app remains non-functional.
+
+   **Possible Causes**:
+   - The Hugging Face API token is missing, expired, or lacks necessary permissions.
+
+   **Solutions**:
+   - Generate a valid API token from [Hugging Face Settings > Access Tokens](https://huggingface.co/settings/tokens).
+   - Ensure the token has **read** and **write** permissions for inference endpoints.
+   - Add the token to your `.env` file:
+     ```env
+     HUGGINGFACE_API_TOKEN=<your-valid-api-token>
+     ```
+
+---
+
+#### 3. **Incorrect Endpoint URLs**
+   **Symptoms**:
+   - Models fail to respond, or the app crashes when trying to analyze input or generate responses.
+
+   **Possible Causes**:
+   - The `CHAT_MODEL_ENDPOINT` or `SENTIMENT_MODEL_ENDPOINT` in your `.env` file is incorrect or points to an inactive model.
+
+   **Solutions**:
+   - Verify the URLs in the `.env` file match the endpoint URLs in your Hugging Face dashboard.
+   - Ensure the endpoints are deployed and active.
+
+---
+
+#### 4. **Endpoints Scaled to Zero**
+   **Symptoms**:
+   - Long delays when interacting with the app.
+   - Errors related to endpoint unavailability.
+
+   **Possible Causes**:
+   - The endpoint is scaled to zero replicas to save costs.
+
+   **Solutions**:
+   - Increase the minimum replica count for the endpoint in the Hugging Face dashboard to avoid cold starts.
+   - Monitor endpoint usage to optimize performance vs. cost.
+
+---
+
+#### 5. **Inference Rate Limit Reached**
+   **Symptoms**:
+   - Errors indicating "429 Too Many Requests."
+   - Delayed or missing responses from the models.
+
+   **Possible Causes**:
+   - Your Hugging Face account's usage limits have been exceeded.
+
+   **Solutions**:
+   - Upgrade your Hugging Face plan or add additional credits to your account.
+   - Use smaller input sizes to reduce token usage.
+
+---
+
+#### 6. **Permission Issues with API Token**
+   **Symptoms**:
+   - Errors such as "403 Forbidden" or "Access Denied."
+
+   **Possible Causes**:
+   - The API token does not have sufficient permissions.
+
+   **Solutions**:
+   - Ensure the token is created with proper permissions:
+     - **read**: To fetch models and endpoints.
+     - **write**: To manage endpoint interactions.
+   - Update the `.env` file with the correct token.
+
+---
+
+### Debugging Steps
+
+If none of the above solutions resolve the issue:
+1. **Check Application Logs**:
+   - Logs are stored in `logs/phoenix.log`. Look for specific errors or stack traces.
+
+2. **Verify Environment Variables**:
+   - Run:
+     ```bash
+     cat .env
+     ```
+     Ensure all variables are set correctly.
+
+3. **Restart the App**:
+   - Stop and restart the app to refresh all configurations:
+     ```bash
+     poetry run python src/app.py
+     ```
+
+4. **Contact Support**:
+   - If issues persist, refer to the [Hugging Face Support Documentation](https://huggingface.co/docs) or raise an issue in the project repository.
+
+---
+
+### Preventative Measures
+
+- Always keep a backup of your `.env` file and ensure it contains valid tokens and endpoints.
+- Regularly monitor the status of your Hugging Face endpoints.
+- Configure models with appropriate replica counts to avoid cold starts.
 
 ---
 
